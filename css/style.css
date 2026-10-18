@@ -372,7 +372,10 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 /* Nuages par altitude */
 .cs-sub { margin: calc(-1 * var(--sp-2)) 0 var(--sp-2); font-size: 13px; color: var(--text-2); }
 .cs { display: block; width: 100%; height: auto; overflow: visible; }
-.cs-cell { fill: #eef1fb; }
+.cs-day { fill: rgba(255, 255, 255, .045); }
+.cs-sep { stroke: rgba(255, 255, 255, .18); stroke-width: 1; }
+.cs-dayname { font: 600 11px var(--font); fill: var(--text-2); text-anchor: middle; }
+.cs-dayname.on { fill: var(--text); }
 .cs-grid { stroke: var(--sep); stroke-width: 1; }
 .cs-ground { fill: #262d45; }
 .cs-sun { stroke: rgba(255, 214, 10, .55); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -386,7 +389,6 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 .cs-legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-3); font-size: 12px; color: var(--text-2); }
 .cs-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .cs-legend i { display: inline-block; width: 12px; height: 8px; border-radius: 2px; }
-.k-cloud { background: linear-gradient(90deg, rgba(238, 241, 251, .15), #eef1fb); }
 .k-summit { height: 0 !important; border-top: 2px dashed var(--c-top); border-radius: 0 !important; }
 .k-rain { background: #4fa8ff; }
 

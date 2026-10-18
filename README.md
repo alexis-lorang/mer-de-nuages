@@ -26,8 +26,8 @@ pour l’ouvrir en plein écran comme une app.
   Tirer vers le bas pour actualiser.
 - **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages) ;
   tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
-  inversion, vent, accord des modèles) ; nuages par altitude heure par heure au-dessus de la vallée de référence,
-  avec l’altitude du sommet et la pluie ; météo du jour au sommet ; webcams proches ; lien vers meteoblue.
+  inversion, vent, accord des modèles) ; nuages par altitude sur 3 jours au-dessus de la vallée de référence
+  (même échelle et mêmes classes que meteoblue, de 0 à 14 km), avec l’altitude du sommet et la pluie ; météo du jour au sommet ; webcams proches ; lien vers meteoblue.
   Retour par le bouton « Lieux » flottant en bas, ou en glissant depuis le bord gauche (app installée).
   Rien d’interactif dans le haut de l’écran : en mode application, iOS floute la zone sous la barre d’état.
 - **Réglages** (bouton à droite du grand titre) : modèle météo, dernière image de jour pour les webcams, actualisation.
@@ -35,7 +35,9 @@ pour l’ouvrir en plein écran comme une app.
 
 Le météogramme meteoblue ne peut pas être intégré : leur page refuse l’affichage dans un autre site
 (`X-Frame-Options: SAMEORIGIN`) et l’image seule demande une clé d’API meteoblue. Le graphique « Nuages par altitude »
-reprend leur coupe des nuages à partir des niveaux de pression Open-Meteo (1000 → 700 hPa).
+reprend leur coupe des nuages à partir des niveaux de pression Open-Meteo (1000 → 200 hPa), interpolés en temps
+et en altitude. Comparé à meteoblue sur Schirmeck et Sarrebourg : mêmes couches aux mêmes heures, les écarts
+restants viennent des modèles (meteoblue utilise son propre mélange).
 
 ## Indice (0–100)
 

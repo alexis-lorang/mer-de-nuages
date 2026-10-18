@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=5';
-import { icon } from './icons.js?v=5';
-import { scene } from './scene.js?v=5';
+} from './forecast.js?v=7';
+import { icon } from './icons.js?v=7';
+import { scene } from './scene.js?v=7';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -431,88 +431,121 @@ function ccAt(levels, z) {
   return levels.at(-1).cc;
 }
 
-// Teinte opaque entre le fond de carte (ciel clair) et le blanc (couvert) : pas de raccords visibles.
-function cloudColor(cc) {
-  const k = 0.1 + 0.9 * Math.min(1, cc / 100);
-  const mix = (a, b) => Math.round(a + (b - a) * k);
-  return `rgb(${mix(26, 238)},${mix(33, 241)},${mix(54, 251)})`;
+// Classes de couverture reprises de meteoblue : 10–25, 25–50, 50–75, 75–90, 90–100 %.
+const CLOUD_BINS = [[90, 'rgb(240,243,252)'], [75, 'rgb(196,203,224)'], [50, 'rgb(146,155,184)'], [25, 'rgb(98,108,140)'], [10, 'rgb(62,71,102)']];
+const cloudColor = (cc) => CLOUD_BINS.find(([min]) => cc >= min)?.[1] ?? null;
+
+// Échelle d'altitude de meteoblue (0 · 1,5 · 3,5 · 6 · 9 · 14 km), détaillée sous 1,5 km pour les mers de nuages.
+const Z_TICKS = [0, 500, 1000, 1500, 3500, 6000, 9000, 14000];
+
+// Image de la coupe : chaque pixel interpole la couverture entre deux heures et deux niveaux,
+// puis prend la couleur de sa classe. Contours lisses, comme sur meteoblue.
+function cloudRaster(hours, ground, zAtRow, w, h) {
+  const k = Math.min(3, Math.max(2, devicePixelRatio || 2));
+  const W = Math.round(w * k), H = Math.round(h * k);
+  const n = hours.length;
+  const rows = Array.from({ length: H }, (_, py) => zAtRow((py + 0.5) / k));
+  const grid = hours.map((hr) => rows.map((z) => (z < ground ? -1 : ccAt(hr.levels, z) ?? 0)));
+  const rgb = CLOUD_BINS.map(([min, c]) => [min, c.match(/\d+/g).map(Number)]);
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  for (let px = 0; px < W; px++) {
+    const t = Math.max(0, Math.min(n - 1, ((px + 0.5) / W) * n - 0.5));
+    const i0 = Math.floor(t), i1 = Math.min(n - 1, i0 + 1), f = t - i0;
+    for (let py = 0; py < H; py++) {
+      const a = grid[i0][py], b = grid[i1][py];
+      if (a < 0 || b < 0) continue;
+      const cc = a + (b - a) * f;
+      const bin = rgb.find(([min]) => cc >= min);
+      if (!bin) continue;
+      const o = (py * W + px) * 4;
+      img.data[o] = bin[1][0]; img.data[o + 1] = bin[1][1]; img.data[o + 2] = bin[1][2]; img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL();
 }
 
 function cloudCard(s, d, valleyKey) {
   const r = state.result;
-  const date = r.sunrise[d].slice(0, 10);
   state.sections[valleyKey] ??= cloudSection(state.data, valleyKey, state.model);
-  const hours = state.sections[valleyKey].filter((h) => h.time.startsWith(date));
-  const rain = weatherFor(s.id).hourly.filter((h) => h.time.startsWith(date));
+  // Trois jours à partir du jour choisi, comme meteoblue.
+  const dates = r.sunrise.slice(d, d + 3).map((t) => t.slice(0, 10));
+  const hours = state.sections[valleyKey].filter((h) => dates.includes(h.time.slice(0, 10)));
+  const rain = weatherFor(s.id).hourly.filter((h) => dates.includes(h.time.slice(0, 10)));
   if (hours.length < 24) return '';
 
-  const W = 320, H = 216, x0 = 34, x1 = W - 4, top = 22, bottom = 170;
-  const cw = (x1 - x0) / 24;
-  const ph = bottom - top;
-  // Échelle verticale dilatée en bas : 0–1 500 m sur 65 % de la hauteur, 1 500–3 000 m au-dessus.
-  const y = (z) => (z <= 1500 ? bottom - (z / 1500) * 0.65 * ph : bottom - 0.65 * ph - ((Math.min(z, 3000) - 1500) / 1500) * 0.35 * ph);
-  const zAt = (py) => {
-    const u = (bottom - py) / ph;
-    return u <= 0.65 ? (u / 0.65) * 1500 : 1500 + ((u - 0.65) / 0.35) * 1500;
+  const n = hours.length;
+  const W = 320, H = 232, x0 = 34, x1 = W - 4, top = 26, bottom = 182;
+  const cw = (x1 - x0) / n;
+  const seg = (bottom - top) / (Z_TICKS.length - 1);
+  const y = (z) => {
+    const zc = Math.max(0, Math.min(z, Z_TICKS.at(-1)));
+    let k = 1;
+    while (k < Z_TICKS.length - 1 && zc > Z_TICKS[k]) k++;
+    return bottom - (k - 1 + (zc - Z_TICKS[k - 1]) / (Z_TICKS[k] - Z_TICKS[k - 1])) * seg;
   };
-  const xh = (t) => { const dt = new Date(t); return x0 + ((dt.getHours() + dt.getMinutes() / 60) / 24) * (x1 - x0); };
+  const zAt = (py) => {
+    const u = (bottom - py) / seg;
+    const k = Math.min(Z_TICKS.length - 2, Math.floor(u));
+    return Z_TICKS[k] + (u - k) * (Z_TICKS[k + 1] - Z_TICKS[k]);
+  };
+  const t0 = new Date(hours[0].time).getTime();
+  const xt = (t) => x0 + ((new Date(t).getTime() - t0) / 3600e3) * cw;
   const ground = hours[0].ground;
   const gy = y(ground);
 
-  let g = `<svg class="cs" viewBox="0 0 ${W} ${H}" role="img" aria-label="Couverture nuageuse par altitude au-dessus de ${valleyName(valleyKey)}, heure par heure">`;
-  // Cases de nuages : plus blanches quand la couverture est forte.
-  const step = 4;
-  g += '<g shape-rendering="crispEdges">';
-  hours.forEach((h, i) => {
-    for (let py = top; py < gy; py += step) {
-      const z = zAt(py + step / 2);
-      if (z < ground) continue;
-      const cc = ccAt(h.levels, z);
-      if (cc == null || cc < 4) continue;
-      g += `<rect x="${(x0 + i * cw).toFixed(1)}" y="${py}" width="${(cw + 0.5).toFixed(1)}" height="${Math.min(step + 0.5, gy - py).toFixed(1)}" fill="${cloudColor(cc)}"/>`;
-    }
+  let g = `<svg class="cs" viewBox="0 0 ${W} ${H}" role="img" aria-label="Couverture nuageuse par altitude au-dessus de ${valleyTown(valleyKey)}, sur trois jours">`;
+  // Journée en bande plus claire, nom des jours en haut.
+  dates.forEach((date, k) => {
+    const i = r.sunrise.findIndex((t) => t.startsWith(date));
+    const sx = xt(r.sunrise[i]), ex = xt(r.sunset[i]);
+    g += `<rect x="${sx.toFixed(1)}" y="${top}" width="${(ex - sx).toFixed(1)}" height="${bottom - top}" class="cs-day"/>`;
+    const dx = x0 + (k * 24 + 12) * cw;
+    g += `<text x="${dx.toFixed(1)}" y="${top - 10}" class="cs-dayname${k === 0 ? ' on' : ''}">${dayLabel(i)}</text>`;
+    if (k) g += `<line x1="${(x0 + k * 24 * cw).toFixed(1)}" x2="${(x0 + k * 24 * cw).toFixed(1)}" y1="${top}" y2="${bottom}" class="cs-sep"/>`;
   });
-  g += '</g>';
-  // Graduations d'altitude.
-  for (const z of [500, 1000, 1500, 2000, 3000]) {
-    g += `<line x1="${x0}" x2="${x1}" y1="${y(z)}" y2="${y(z)}" class="cs-grid"/><text x="${x0 - 5}" y="${y(z) + 3.5}" class="cs-lbl end">${z}</text>`;
+  // Nuages lissés (interpolés en temps et en altitude), dessinés en image.
+  g += `<image x="${x0}" y="${top}" width="${x1 - x0}" height="${(gy - top).toFixed(1)}" preserveAspectRatio="none"
+    href="${cloudRaster(hours, ground, (py) => zAt(top + py), x1 - x0, gy - top)}"/>`;
+  // Graduations.
+  for (const z of Z_TICKS.slice(1)) {
+    g += `<line x1="${x0}" x2="${x1}" y1="${y(z).toFixed(1)}" y2="${y(z).toFixed(1)}" class="cs-grid"/>
+      <text x="${x0 - 5}" y="${(y(z) + 3.5).toFixed(1)}" class="cs-lbl end">${z < 1000 ? z : `${num(z / 1000)} k`}</text>`;
   }
-  g += `<text x="${x0 - 5}" y="${top - 8}" class="cs-lbl end">m</text>`;
-  // Sol de la vallée.
+  g += `<text x="${x0 - 5}" y="${top - 10}" class="cs-lbl end">m</text>`;
   g += `<rect x="${x0}" y="${gy.toFixed(1)}" width="${x1 - x0}" height="${(bottom - gy).toFixed(1)}" class="cs-ground"/>`;
-  // Lever, coucher, maintenant.
-  for (const [t, ic] of [[r.sunrise[d], 'sunrise'], [r.sunset[d], 'sunset']]) {
-    const sx = xh(t);
-    g += `<line x1="${sx}" x2="${sx}" y1="${top}" y2="${bottom}" class="cs-sun"/>`;
-    g += icon(ic, 'cs-ic').replace('<svg ', `<svg x="${(sx - 7).toFixed(1)}" y="3" width="14" height="14" `);
-  }
   if (d === 0) {
-    const nx = xh(Date.now());
-    g += `<line x1="${nx}" x2="${nx}" y1="${top}" y2="${bottom}" class="cs-now"/>`;
+    const nx = xt(Date.now());
+    if (nx > x0 && nx < x1) g += `<line x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${top}" y2="${bottom}" class="cs-now"/>`;
   }
   // Altitude du sommet.
   const sy = y(s.alt);
-  g += `<line x1="${x0}" x2="${x1}" y1="${sy}" y2="${sy}" class="cs-summit"/>
-    <text x="${x1 - 4}" y="${sy - 4}" class="cs-summit-lbl">${s.name} ${s.alt} m</text>`;
+  g += `<line x1="${x0}" x2="${x1}" y1="${sy.toFixed(1)}" y2="${sy.toFixed(1)}" class="cs-summit"/>
+    <text x="${x1 - 4}" y="${(sy - 4).toFixed(1)}" class="cs-summit-lbl">${s.name} ${s.alt} m</text>`;
   // Pluie au lieu.
   const pMax = Math.max(2, ...rain.map((h) => h.precip ?? 0));
-  const rb = 196;
+  const rb = 210;
   g += `<text x="${x0 - 5}" y="${rb - 3}" class="cs-lbl end">mm</text>`;
   rain.forEach((h, i) => {
     if (!h.precip) return;
     const bh = Math.max(1.5, (h.precip / pMax) * 18);
-    g += `<rect x="${(x0 + i * cw + 1).toFixed(1)}" y="${(rb - bh).toFixed(1)}" width="${(cw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="1" class="cs-rain"/>`;
+    g += `<rect x="${(x0 + i * cw + 0.3).toFixed(2)}" y="${(rb - bh).toFixed(1)}" width="${Math.max(1, cw - 0.6).toFixed(2)}" height="${bh.toFixed(1)}" class="cs-rain"/>`;
   });
   g += `<line x1="${x0}" x2="${x1}" y1="${rb}" y2="${rb}" class="cs-grid"/>`;
-  for (const k of [0, 6, 12, 18]) g += `<text x="${x0 + (k / 24) * (x1 - x0) + (k ? 0 : 8)}" y="${H - 4}" class="cs-lbl">${String(k).padStart(2, '0')} h</text>`;
+  dates.forEach((_, k) => {
+    for (const hh of [6, 12, 18]) g += `<text x="${(x0 + (k * 24 + hh) * cw).toFixed(1)}" y="${H - 6}" class="cs-lbl">${hh}</text>`;
+  });
   g += '</svg>';
 
   return `<div class="card clouds">
     ${cardHead('layers', 'Nuages par altitude')}
-    <p class="cs-sub">Au-dessus de ${valleyTown(valleyKey)} (vallée à ${Math.round(ground)} m), ${dayLabel(d).toLowerCase()}</p>
+    <p class="cs-sub">Au-dessus de ${valleyTown(valleyKey)} (vallée à ${Math.round(ground)} m), sur 3 jours</p>
     ${g}
     <div class="cs-legend">
-      <span><i class="k-cloud"></i>Nuages (clair = couvert)</span>
+      ${CLOUD_BINS.slice().reverse().map(([min], k, a) => `<span><i style="background:${cloudColor(min)}"></i>${min}${k < a.length - 1 ? `–${a[k + 1][0]}` : '–100'} %</span>`).join('')}
       <span><i class="k-summit"></i>Sommet</span>
       <span><i class="k-rain"></i>Pluie (max ${num(pMax)} mm/h)</span>
     </div>

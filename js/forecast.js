@@ -3,18 +3,21 @@ import { SITES, VALLEYS, MODELS } from './config.js';
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
+// Niveaux d'altitude supplémentaires pour le graphique des nuages (jusqu'à ~12 km).
+const HIGH_LEVELS = [600, 500, 400, 300, 250, 200];
 const SURFACE = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility', 'temperature_2m', 'relative_humidity_2m', 'dew_point_2m', 'wind_speed_10m'];
 // Météo au lieu (affichage seulement).
 const WEATHER = ['weather_code', 'precipitation', 'cloud_cover', 'wind_gusts_10m', 'wind_direction_10m'];
 const DAILY = ['sunrise', 'sunset', 'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max'];
 const ALL_MODELS = MODELS.consensus.ids;
-const CACHE_KEY = 'mdn-forecast-v3';
+const CACHE_KEY = 'mdn-forecast-v4';
 const CACHE_TTL = 30 * 60 * 1000;
 
 function hourlyVars() {
   const v = [...SURFACE, ...WEATHER];
   for (const p of LEVELS) v.push(`cloud_cover_${p}hPa`, `temperature_${p}hPa`, `relative_humidity_${p}hPa`, `geopotential_height_${p}hPa`);
   for (const p of WIND_LEVELS) v.push(`wind_speed_${p}hPa`);
+  for (const p of HIGH_LEVELS) v.push(`cloud_cover_${p}hPa`, `geopotential_height_${p}hPa`);
   return v;
 }
 
@@ -331,17 +334,21 @@ export function nowIndex(result) {
 // En consensus : moyenne des modèles niveau par niveau.
 export function cloudSection(data, key, modelKey) {
   const loc = data.raw[key];
-  const profs = MODELS[modelKey].ids.map((m) => buildProfiles(loc, m));
-  return loc.hourly.time.map((time, i) => {
-    const byP = new Map();
-    for (const prof of profs) {
-      for (const l of prof[i]?.levels ?? []) {
-        const a = byP.get(l.p) ?? { z: 0, cc: 0, n: 0 };
-        a.z += l.z; a.cc += l.cc; a.n++;
-        byP.set(l.p, a);
+  const h = loc.hourly;
+  const models = MODELS[modelKey].ids;
+  return h.time.map((time, i) => {
+    const levels = [];
+    for (const p of [...LEVELS, ...HIGH_LEVELS]) {
+      let z = 0, cc = 0, n = 0;
+      for (const m of models) {
+        const zz = pick(h, `geopotential_height_${p}hPa`, m)?.[i];
+        const c = pick(h, `cloud_cover_${p}hPa`, m)?.[i];
+        if (zz == null || c == null) continue;
+        z += zz; cc += c; n++;
       }
+      if (n) levels.push({ z: z / n, cc: cc / n });
     }
-    const levels = [...byP.values()].map((a) => ({ z: a.z / a.n, cc: a.cc / a.n })).sort((a, b) => a.z - b.z);
+    levels.sort((a, b) => a.z - b.z);
     return { time, ground: loc.elevation ?? 0, levels };
   });
 }
