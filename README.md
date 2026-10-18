@@ -27,8 +27,9 @@ pour l’ouvrir en plein écran comme une app.
   tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
   inversion, vent, accord des modèles) ; météo du jour au sommet et météogramme (nuages, température, pluie,
   lever et coucher) ; webcams proches ; lien vers meteoblue.
-  Retour par « Lieux » ou en glissant depuis le bord gauche (app installée).
-- **Réglages** (icône en haut à droite) : modèle météo, dernière image de jour pour les webcams, actualisation.
+  Retour par le bouton « Lieux » flottant en bas, ou en glissant depuis le bord gauche (app installée).
+  Rien d’interactif dans le haut de l’écran : en mode application, iOS floute la zone sous la barre d’état.
+- **Réglages** (bouton à droite du grand titre) : modèle météo, dernière image de jour pour les webcams, actualisation.
 - Chaque page a sa propre adresse (`#/lieu/donon/1` = Donon, demain), partageable.
 
 Le météogramme meteoblue ne peut pas être intégré : leur site interdit l’affichage dans une autre page

@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, MORNING, EVENING,
-} from './forecast.js?v=3';
-import { icon } from './icons.js?v=3';
-import { scene } from './scene.js?v=3';
+} from './forecast.js?v=4';
+import { icon } from './icons.js?v=4';
+import { scene } from './scene.js?v=4';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -252,7 +252,6 @@ function setGlow(cls, instant = false) {
 
 function renderDetail(enter = false) {
   const s = siteById(state.site);
-  $('#detail-nav-title').textContent = s.name;
   const body = $('#detail-body');
   const head = `<div class="large-title"><h1 tabindex="-1">${s.name}</h1><p class="subtitle">${s.alt} m d’altitude</p></div>`;
 
@@ -542,7 +541,6 @@ function route() {
     state.day = r.day;
     if (changed) {
       $('.scroller', detail).scrollTop = 0;
-      detail.classList.remove('scrolled');
       renderDetail(true);
     }
     onDetail = true;
@@ -585,12 +583,11 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Barre de navigation compacte au défilement, grand titre élastique.
+// Grand titre élastique quand on tire vers le bas.
 for (const page of $$('.page')) {
   const sc = $('.scroller', page);
   sc.addEventListener('scroll', () => {
     const y = sc.scrollTop;
-    page.classList.toggle('scrolled', y > 44);
     const lt = $('.large-title', page);
     if (lt) lt.style.transform = y < 0 ? `scale(${1 + Math.min(0.08, -y / 900)})` : '';
     if (page.id === 'home') pullToRefresh(y);
