@@ -61,4 +61,4 @@ Les seuils et pondérations sont dans `js/forecast.js` (`scoreHour`). C’est un
 - `js/app.js` : interface (accueil, page lieu, navigation, réglages)
 - `js/scene.js` : illustration animée (montagne, mer de nuages, ciel)
 - `js/icons.js` : icônes SVG
-- `manifest.webmanifest`, `icon.svg`, `apple-touch-icon.png` : installation sur l’écran d’accueil
+- `manifest.webmanifest`, `icon.svg`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` : icône et installation sur l’écran d’accueil (PNG rendus depuis `icon.svg` avec QuickLook, `qlmanage -t -s 1024`)
