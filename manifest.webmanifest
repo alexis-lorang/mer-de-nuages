@@ -1,0 +1,17 @@
+{
+  "name": "Mers de nuages",
+  "short_name": "Mers de nuages",
+  "description": "Prévision des mers de nuages dans les Vosges du Nord",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1636",
+  "theme_color": "#0b1636",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

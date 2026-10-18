@@ -2,10 +2,17 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mers de nuages · Vosges du Nord</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mers de nuages</title>
+  <meta name="description" content="Prévision des mers de nuages dans les Vosges du Nord">
+  <meta name="theme-color" content="#0e1b3d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mers de nuages">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,78 +21,71 @@
     if (location.protocol === 'file:') {
       document.addEventListener('DOMContentLoaded', () => {
         document.body.insertAdjacentHTML('afterbegin',
-          '<div class="file-warning">Le dashboard doit être ouvert via le serveur local, pas en double-cliquant sur index.html. ' +
-          'Double-clique plutôt sur <b>« Lancer le dashboard.command »</b> dans le dossier du projet.</div>');
+          '<div class="file-warning">Ouvre l’application via le serveur local : double-clique sur <b>« Lancer le dashboard.command »</b>.</div>');
       });
     }
   </script>
-  <header class="topbar">
-    <div class="brand">
-      <h1>Mers de nuages</h1>
-      <span class="sub" id="updated">Vosges du Nord</span>
-    </div>
-    <nav class="views" aria-label="Vue">
-      <button class="view-btn active" data-view="forecast">Mers de nuages</button>
-      <button class="view-btn" data-view="inversion">Cartes</button>
-    </nav>
-    <div class="controls" id="forecast-controls">
-      <select id="model" aria-label="Modèle météo"></select>
-      <button id="refresh" class="btn" title="Recharger les prévisions">↻</button>
-    </div>
-  </header>
 
-  <div id="view-forecast">
-  <main class="hero">
-    <section class="card grid-card">
-      <div class="card-head">
-        <h2>Prochains matins</h2>
-        <div class="legend">
-          <span><i class="dot low"></i>Peu probable</span>
-          <span><i class="dot maybe"></i>Possible</span>
-          <span><i class="dot good"></i>Probable</span>
-          <span><i class="dot top"></i>Très probable</span>
-        </div>
+  <!-- Accueil -->
+  <section class="page" id="home" aria-label="Accueil">
+    <div class="sky" aria-hidden="true">
+      <div class="sky-layer on" data-sky="home"></div>
+      <div class="stars"></div>
+      <div class="fog"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+    </div>
+    <header class="navbar">
+      <div class="nav-side"></div>
+      <div class="nav-title">Mers de nuages</div>
+      <div class="nav-side right">
+        <button class="icon-btn" data-action="settings" aria-label="Réglages"></button>
       </div>
-      <div id="best" class="best-row"></div>
-      <div class="grid-scroll"><table id="grid" class="grid"></table></div>
-      <p class="muted hint">Chiffre : chance de mer de nuages (0–100) au meilleur moment du matin · ☁ : altitude du dessus des nuages · « dans le nuage » : le site est noyé. Cliquer une case pour le détail.</p>
-    </section>
-
-    <section class="card map-card">
-      <div id="map"></div>
-    </section>
-  </main>
-
-  <section id="detail" class="card detail-card"></section>
-
-  <section class="card">
-    <details id="cams-block">
-      <summary><h2>Toutes les webcams</h2>
-        <label class="toggle" onclick="event.stopPropagation()"><input type="checkbox" id="daylight"> Dernière image de jour</label>
-      </summary>
-      <div id="cams" class="cams"></div>
-    </details>
-  </section>
-  </div>
-
-  <div id="view-inversion" class="inv-view" hidden></div>
-
-  <footer class="foot">
-    Indice calculé à partir des profils verticaux des modèles ICON et AROME/ARPEGE
-    (<a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>) :
-    nuages bas en vallée sous le sommet, sommet hors du nuage, ciel dégagé au-dessus, inversion, vent faible.
-    Webcams <a href="https://www.windy.com/webcams" target="_blank" rel="noopener">Windy</a>.
-  </footer>
-
-  <dialog id="modal" class="modal">
-    <div class="modal-head">
-      <strong id="modal-title"></strong>
-      <button class="btn" id="modal-close" aria-label="Fermer">✕</button>
+    </header>
+    <div class="ptr" aria-hidden="true"><span class="ptr-spin"></span></div>
+    <div class="scroller">
+      <div class="large-title">
+        <h1>Mers de nuages</h1>
+        <p class="subtitle" id="updated">Vosges du Nord</p>
+      </div>
+      <main id="home-body" class="content"></main>
     </div>
-    <div id="modal-body" class="modal-body"></div>
+  </section>
+
+  <!-- Détail d'un lieu -->
+  <section class="page" id="detail" aria-label="Détail du lieu" inert>
+    <div class="sky" aria-hidden="true">
+      <div class="sky-layer" data-sky="top"></div>
+      <div class="sky-layer" data-sky="good"></div>
+      <div class="sky-layer" data-sky="maybe"></div>
+      <div class="sky-layer on" data-sky="low"></div>
+      <div class="stars"></div>
+      <div class="fog"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+    </div>
+    <header class="navbar">
+      <div class="nav-side">
+        <button class="back-btn" data-action="back"><span class="back-ic"></span><span>Lieux</span></button>
+      </div>
+      <div class="nav-title" id="detail-nav-title"></div>
+      <div class="nav-side right">
+        <a class="icon-btn" id="detail-meteoblue" target="_blank" rel="noopener" aria-label="Météogramme meteoblue"></a>
+      </div>
+    </header>
+    <div class="scroller">
+      <main id="detail-body" class="content"></main>
+    </div>
+  </section>
+
+  <!-- Feuille modale (réglages, webcams) -->
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+    <div class="sheet-panel">
+      <div class="sheet-grab" aria-hidden="true"><i></i></div>
+      <div class="sheet-head">
+        <h2 id="sheet-title"></h2>
+        <button class="sheet-done" data-action="close-sheet">OK</button>
+      </div>
+      <div class="sheet-body" id="sheet-body"></div>
+    </div>
   </dialog>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

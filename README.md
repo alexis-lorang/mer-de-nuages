@@ -1,6 +1,6 @@
 # Mers de nuages · Vosges du Nord
 
-Dashboard statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 5 jours pour :
+Application web statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 5 jours pour :
 Donon, Rocher de Mutzig, Rocher de Dabo, Col du Valsberg et Château du Haut-Barr.
 
 ## Lancer
@@ -16,25 +16,20 @@ python3 -m http.server 8765
 
 Puis ouvrir http://localhost:8765. Un serveur est nécessaire, car les modules ES ne se chargent pas en `file://`.
 
-## Contenu
+## Interface
 
-- **Prochains matins** (en haut) : grille sites × 5 matins. Chaque case montre une coupe illustrée (montagne, nuages, ciel) et l’indice. À côté de chaque site : température, humidité et point de rosée actuels au sommet.
-- **Carte** (à droite) : sites colorés selon le matin choisi, webcams 📷 en popup.
-- **Détail** (clic sur une case) : verdict et accord entre modèles, checklist des 4 conditions, tableau heure par heure autour du lever (indice, sommet des nuages, température / point de rosée / humidité au sommet et en vallée), lien vers le météogramme meteoblue, webcams proches.
-- **Toutes les webcams** (repliable) : 12 webcams Windy, image actuelle ou dernière image de jour. Un clic ouvre le timelapse 24 h.
+Application web pensée pour iPhone, au style d’iOS (ciel animé, cartes en verre dépoli, transitions de navigation).
+Sur iPhone : Safari → Partager → « Sur l’écran d’accueil » pour l’ouvrir en plein écran comme une app.
 
-## Cartes (inversion et saturation)
-
-Onglet « Cartes », deux modes :
-
-- **Saturation (T − Td)** : écart entre température et point de rosée à 2 m. Bleu foncé ≤ 0,5 °C (saturé, brouillard probable),
-  bleu 0,5–1,5 °C (quasi saturé), bleu clair 1,5–3 °C (humide), rien au-delà. Badge du jour : part du secteur saturée au lever.
-- **Inversion** : grille d’environ 200 points (un tous les ~4 km) de Sarrebourg à la plaine d’Alsace.
-En chaque point, force de l’inversion = température la plus chaude dans les 1 500 m au-dessus du sol − température au sol (2 m).
-Couleurs : jaune 0,5–2 °C, orange 2–4 °C, rouge 4–6 °C, violet > 6 °C. Choix du jour, de l’heure (par défaut le prochain lever)
-et du modèle (AROME 1,3 km par défaut, ou ICON). Badge du jour : inversion maximale au lever.
-
-Grille chargée seulement à l’ouverture de l’onglet, avec un cache d’une heure (`js/inversion.js`).
+- **Accueil** : la meilleure chance des 5 prochains matins, puis une carte par lieu avec l’indice du prochain matin
+  et une barre par jour. Toucher un lieu (ou un jour) ouvre sa page. Tirer vers le bas pour actualiser.
+- **Page d’un lieu** : indice, verdict, meilleur moment et lever du soleil ; sélecteur de matin ; coupe illustrée
+  (montagne, mer de nuages, ciel) ; les 4 conditions ; tableau heure par heure autour du lever
+  (indice, sommet des nuages, température / point de rosée / humidité au sommet et en vallée) ; tuiles
+  (dessus des nuages, inversion, vent, ciel au-dessus, sommet, vallée, conditions actuelles) ; accord des modèles ;
+  webcams proches ; lien meteoblue. Retour par le bouton « Lieux » ou en glissant depuis le bord gauche (app installée).
+- **Réglages** (icône en haut à droite) : modèle météo, dernière image de jour pour les webcams, actualisation.
+- Chaque page a sa propre adresse (`#/lieu/donon/1` = Donon, demain matin), partageable.
 
 ## Indice (0–100)
 
@@ -59,4 +54,7 @@ Les seuils et pondérations sont dans `js/forecast.js` (`scoreHour`). C’est un
 
 - `js/config.js` : sites, vallées de référence, webcams, URLs meteoblue/Windy
 - `js/forecast.js` : récupération Open-Meteo (cache 30 min) et calcul de l’indice
-- `js/app.js` : interface
+- `js/app.js` : interface (accueil, page lieu, navigation, réglages)
+- `js/scene.js` : illustration animée (montagne, mer de nuages, ciel)
+- `js/icons.js` : icônes SVG
+- `manifest.webmanifest`, `icon.svg`, `apple-touch-icon.png` : installation sur l’écran d’accueil
