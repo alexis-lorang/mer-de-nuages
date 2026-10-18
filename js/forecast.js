@@ -4,12 +4,15 @@ import { SITES, VALLEYS, MODELS } from './config.js';
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
 const SURFACE = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility', 'temperature_2m', 'relative_humidity_2m', 'dew_point_2m', 'wind_speed_10m'];
+// Météo au lieu (affichage seulement).
+const WEATHER = ['weather_code', 'precipitation', 'cloud_cover', 'wind_gusts_10m', 'wind_direction_10m'];
+const DAILY = ['sunrise', 'sunset', 'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max'];
 const ALL_MODELS = MODELS.consensus.ids;
-const CACHE_KEY = 'mdn-forecast-v2';
+const CACHE_KEY = 'mdn-forecast-v3';
 const CACHE_TTL = 30 * 60 * 1000;
 
 function hourlyVars() {
-  const v = [...SURFACE];
+  const v = [...SURFACE, ...WEATHER];
   for (const p of LEVELS) v.push(`cloud_cover_${p}hPa`, `temperature_${p}hPa`, `relative_humidity_${p}hPa`, `geopotential_height_${p}hPa`);
   for (const p of WIND_LEVELS) v.push(`wind_speed_${p}hPa`);
   return v;
@@ -53,7 +56,7 @@ async function fetchModel(locs, model, attempt = 1) {
     latitude: locs.map((l) => l.lat).join(','),
     longitude: locs.map((l) => l.lon).join(','),
     hourly: hourlyVars().join(','),
-    daily: 'sunrise,sunset',
+    daily: DAILY.join(','),
     models: model,
     forecast_days: '5',
     timezone: 'Europe/Paris',
@@ -242,15 +245,59 @@ export function computeAll(data, modelKey) {
   return { times, sunrise, sunset, sites, models };
 }
 
-// Fenêtre du matin : lever du soleil -1 h à +2 h.
-export function morningWindow(result, dayIdx) {
-  const sr = new Date(result.sunrise[dayIdx]);
-  const from = new Date(sr.getTime() - 60 * 60e3);
-  const to = new Date(sr.getTime() + 2 * 60 * 60e3);
+function windowIdx(result, from, to) {
   return result.times
     .map((t, i) => ({ t: new Date(t), i }))
     .filter(({ t }) => t >= from && t <= to)
     .map(({ i }) => i);
+}
+
+// Fenêtre du matin : lever du soleil -1 h à +2 h.
+export const MORNING = { before: 1, after: 2 };
+export function morningWindow(result, dayIdx) {
+  const sr = new Date(result.sunrise[dayIdx]).getTime();
+  return windowIdx(result, new Date(sr - MORNING.before * 3600e3), new Date(sr + MORNING.after * 3600e3));
+}
+
+// Fenêtre du soir : coucher du soleil -2 h à +1 h.
+export const EVENING = { before: 2, after: 1 };
+export function eveningWindow(result, dayIdx) {
+  const ss = new Date(result.sunset[dayIdx]).getTime();
+  return windowIdx(result, new Date(ss - EVENING.before * 3600e3), new Date(ss + EVENING.after * 3600e3));
+}
+
+// Météo au lieu, pour un modèle (en consensus : AROME, plus fin sur la France, complété par ICON).
+export function siteWeather(data, siteId, modelKey) {
+  const models = modelKey === 'consensus' ? ['meteofrance_seamless', 'icon_seamless'] : MODELS[modelKey].ids;
+  const loc = data.raw[siteId];
+  const get = (part, name, i) => {
+    for (const m of models) {
+      const v = pick(loc[part], name, m)?.[i];
+      if (v != null) return v;
+    }
+    return null;
+  };
+  const hourly = loc.hourly.time.map((time, i) => ({
+    time,
+    code: get('hourly', 'weather_code', i),
+    t: get('hourly', 'temperature_2m', i),
+    rh: get('hourly', 'relative_humidity_2m', i),
+    precip: get('hourly', 'precipitation', i),
+    cc: get('hourly', 'cloud_cover', i),
+    wind: get('hourly', 'wind_speed_10m', i),
+    gust: get('hourly', 'wind_gusts_10m', i),
+    dir: get('hourly', 'wind_direction_10m', i),
+  }));
+  const daily = loc.daily.time.map((date, i) => ({
+    date,
+    code: get('daily', 'weather_code', i),
+    tmax: get('daily', 'temperature_2m_max', i),
+    tmin: get('daily', 'temperature_2m_min', i),
+    precip: get('daily', 'precipitation_sum', i),
+    wind: get('daily', 'wind_speed_10m_max', i),
+    gust: get('daily', 'wind_gusts_10m_max', i),
+  }));
+  return { hourly, daily };
 }
 
 export function bestInWindow(hours, idxs) {

@@ -18,18 +18,22 @@ Puis ouvrir http://localhost:8765. Un serveur est nécessaire, car les modules E
 
 ## Interface
 
-Application web pensée pour iPhone, au style d’iOS (ciel animé, cartes en verre dépoli, transitions de navigation).
-Sur iPhone : Safari → Partager → « Sur l’écran d’accueil » pour l’ouvrir en plein écran comme une app.
+Application web pensée pour iPhone, au style d’iOS. Sur iPhone : Safari → Partager → « Sur l’écran d’accueil »
+pour l’ouvrir en plein écran comme une app.
 
-- **Accueil** : la meilleure chance des 5 prochains matins, puis une carte par lieu avec l’indice du prochain matin
-  et une barre par jour. Toucher un lieu (ou un jour) ouvre sa page. Tirer vers le bas pour actualiser.
-- **Page d’un lieu** : indice, verdict, meilleur moment et lever du soleil ; sélecteur de matin ; coupe illustrée
-  (montagne, mer de nuages, ciel) ; les 4 conditions ; tableau heure par heure autour du lever
-  (indice, sommet des nuages, température / point de rosée / humidité au sommet et en vallée) ; tuiles
-  (dessus des nuages, inversion, vent, ciel au-dessus, sommet, vallée, conditions actuelles) ; accord des modèles ;
-  webcams proches ; lien meteoblue. Retour par le bouton « Lieux » ou en glissant depuis le bord gauche (app installée).
+- **Accueil** : la meilleure chance à venir, puis la liste des lieux avec l’indice des deux prochains rendez-vous
+  (lever et coucher du soleil, dans l’ordre). Toucher un lieu ouvre sa page. Tirer vers le bas pour actualiser.
+- **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages) ;
+  tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
+  inversion, vent, accord des modèles) ; météo du jour au sommet et météogramme (nuages, température, pluie,
+  lever et coucher) ; webcams proches ; lien vers meteoblue.
+  Retour par « Lieux » ou en glissant depuis le bord gauche (app installée).
 - **Réglages** (icône en haut à droite) : modèle météo, dernière image de jour pour les webcams, actualisation.
-- Chaque page a sa propre adresse (`#/lieu/donon/1` = Donon, demain matin), partageable.
+- Chaque page a sa propre adresse (`#/lieu/donon/1` = Donon, demain), partageable.
+
+Le météogramme meteoblue ne peut pas être intégré : leur site interdit l’affichage dans une autre page
+(`X-Frame-Options: SAMEORIGIN`). Le météogramme est donc dessiné à partir des données Open-Meteo du lieu
+(AROME, complété par ICON au-delà de sa portée).
 
 ## Indice (0–100)
 
@@ -47,7 +51,7 @@ et on garde la meilleure :
 | Inversion | T au-dessus du sommet − T dans la couche nuageuse |
 | Vent faible | vent interpolé à l’altitude du site |
 
-L’indice du jour retient le meilleur créneau entre 1 h avant et 2 h après le lever du soleil.
+L’indice retient le meilleur créneau entre 1 h avant et 2 h après le lever du soleil, et entre 2 h avant et 1 h après le coucher.
 Les seuils et pondérations sont dans `js/forecast.js` (`scoreHour`). C’est une heuristique, à ajuster avec l’expérience du terrain.
 
 ## Fichiers

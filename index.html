@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Mers de nuages</title>
   <meta name="description" content="Prévision des mers de nuages dans les Vosges du Nord">
-  <meta name="theme-color" content="#0e1b3d">
+  <meta name="theme-color" content="#090d18">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,7 +13,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
   <script>
@@ -28,11 +28,7 @@
 
   <!-- Accueil -->
   <section class="page" id="home" aria-label="Accueil">
-    <div class="sky" aria-hidden="true">
-      <div class="sky-layer on" data-sky="home"></div>
-      <div class="stars"></div>
-      <div class="fog"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
-    </div>
+    <div class="glows" aria-hidden="true"><div class="glow on" data-glow="home"></div></div>
     <header class="navbar">
       <div class="nav-side"></div>
       <div class="nav-title">Mers de nuages</div>
@@ -52,22 +48,18 @@
 
   <!-- Détail d'un lieu -->
   <section class="page" id="detail" aria-label="Détail du lieu" inert>
-    <div class="sky" aria-hidden="true">
-      <div class="sky-layer" data-sky="top"></div>
-      <div class="sky-layer" data-sky="good"></div>
-      <div class="sky-layer" data-sky="maybe"></div>
-      <div class="sky-layer on" data-sky="low"></div>
-      <div class="stars"></div>
-      <div class="fog"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+    <div class="glows" aria-hidden="true">
+      <div class="glow" data-glow="top"></div>
+      <div class="glow" data-glow="good"></div>
+      <div class="glow" data-glow="maybe"></div>
+      <div class="glow on" data-glow="low"></div>
     </div>
     <header class="navbar">
       <div class="nav-side">
         <button class="back-btn" data-action="back"><span class="back-ic"></span><span>Lieux</span></button>
       </div>
       <div class="nav-title" id="detail-nav-title"></div>
-      <div class="nav-side right">
-        <a class="icon-btn" id="detail-meteoblue" target="_blank" rel="noopener" aria-label="Météogramme meteoblue"></a>
-      </div>
+      <div class="nav-side right"></div>
     </header>
     <div class="scroller">
       <main id="detail-body" class="content"></main>
@@ -86,6 +78,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>
