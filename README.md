@@ -21,20 +21,21 @@ Puis ouvrir http://localhost:8765. Un serveur est nécessaire, car les modules E
 Application web pensée pour iPhone, au style d’iOS. Sur iPhone : Safari → Partager → « Sur l’écran d’accueil »
 pour l’ouvrir en plein écran comme une app.
 
-- **Accueil** : la meilleure chance à venir, puis la liste des lieux avec l’indice des deux prochains rendez-vous
-  (lever et coucher du soleil, dans l’ordre). Toucher un lieu ouvre sa page. Tirer vers le bas pour actualiser.
+- **Accueil** : la meilleure chance à venir, puis la liste des lieux avec l’indice des 4 prochains jours
+  (meilleur moment de la journée, lever ou coucher). Toucher un jour ouvre la page du lieu sur ce jour.
+  Tirer vers le bas pour actualiser.
 - **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages) ;
   tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
-  inversion, vent, accord des modèles) ; météo du jour au sommet et météogramme (nuages, température, pluie,
-  lever et coucher) ; webcams proches ; lien vers meteoblue.
+  inversion, vent, accord des modèles) ; nuages par altitude heure par heure au-dessus de la vallée de référence,
+  avec l’altitude du sommet et la pluie ; météo du jour au sommet ; webcams proches ; lien vers meteoblue.
   Retour par le bouton « Lieux » flottant en bas, ou en glissant depuis le bord gauche (app installée).
   Rien d’interactif dans le haut de l’écran : en mode application, iOS floute la zone sous la barre d’état.
 - **Réglages** (bouton à droite du grand titre) : modèle météo, dernière image de jour pour les webcams, actualisation.
 - Chaque page a sa propre adresse (`#/lieu/donon/1` = Donon, demain), partageable.
 
-Le météogramme meteoblue ne peut pas être intégré : leur site interdit l’affichage dans une autre page
-(`X-Frame-Options: SAMEORIGIN`). Le météogramme est donc dessiné à partir des données Open-Meteo du lieu
-(AROME, complété par ICON au-delà de sa portée).
+Le météogramme meteoblue ne peut pas être intégré : leur page refuse l’affichage dans un autre site
+(`X-Frame-Options: SAMEORIGIN`) et l’image seule demande une clé d’API meteoblue. Le graphique « Nuages par altitude »
+reprend leur coupe des nuages à partir des niveaux de pression Open-Meteo (1000 → 700 hPa).
 
 ## Indice (0–100)
 
@@ -62,4 +63,4 @@ Les seuils et pondérations sont dans `js/forecast.js` (`scoreHour`). C’est un
 - `js/app.js` : interface (accueil, page lieu, navigation, réglages)
 - `js/scene.js` : illustration animée (montagne, mer de nuages, ciel)
 - `js/icons.js` : icônes SVG
-- `manifest.webmanifest`, `icon.svg`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` : icône et installation sur l’écran d’accueil (PNG rendus depuis `icon.svg` avec QuickLook, `qlmanage -t -s 1024`)
+- `icon.svg` : source de l’icône ; `apple-touch-icon.png` (180 px, écran d’accueil iOS) et `icon-192.png` en sont rendus avec QuickLook (`qlmanage -t -s 1024 icon.svg`, puis `magick … -resize`). Pas de manifeste : iOS y choisissait une icône qu’il n’affichait pas.

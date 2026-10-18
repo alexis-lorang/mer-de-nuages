@@ -326,3 +326,22 @@ export function nowIndex(result) {
   });
   return best;
 }
+
+// Couverture nuageuse par altitude, heure par heure, au-dessus d'un point (lieu ou vallée).
+// En consensus : moyenne des modèles niveau par niveau.
+export function cloudSection(data, key, modelKey) {
+  const loc = data.raw[key];
+  const profs = MODELS[modelKey].ids.map((m) => buildProfiles(loc, m));
+  return loc.hourly.time.map((time, i) => {
+    const byP = new Map();
+    for (const prof of profs) {
+      for (const l of prof[i]?.levels ?? []) {
+        const a = byP.get(l.p) ?? { z: 0, cc: 0, n: 0 };
+        a.z += l.z; a.cc += l.cc; a.n++;
+        byP.set(l.p, a);
+      }
+    }
+    const levels = [...byP.values()].map((a) => ({ z: a.z / a.n, cc: a.cc / a.n })).sort((a, b) => a.z - b.z);
+    return { time, ground: loc.elevation ?? 0, levels };
+  });
+}

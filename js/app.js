@@ -4,10 +4,10 @@ import {
 } from './config.js';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
-  siteWeather, MORNING, EVENING,
-} from './forecast.js?v=4';
-import { icon } from './icons.js?v=4';
-import { scene } from './scene.js?v=4';
+  siteWeather, cloudSection, MORNING, EVENING,
+} from './forecast.js?v=5';
+import { icon } from './icons.js?v=5';
+import { scene } from './scene.js?v=5';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -28,6 +28,7 @@ const state = {
   data: null,
   result: null,
   weather: {},
+  sections: {},
   loading: false,
   error: null,
   model: store.get('mdn-model', 'consensus'),
@@ -62,6 +63,22 @@ function dayBest(siteId, d) {
   return b.score > a.score ? b : a;
 }
 
+const isPast = (d, kind) => new Date(KINDS[kind].at(state.result, d)).getTime() + KINDS[kind].after * 3600e3 < Date.now();
+
+// Meilleure chance de la journée, parmi les levers/couchers pas encore passés.
+function dayScore(siteId, d) {
+  let best = null;
+  for (const kind of ['rise', 'set']) {
+    if (isPast(d, kind)) continue;
+    const m = moment(siteId, d, kind);
+    if (m && (!best || m.score > best.score)) best = { ...m, kind };
+  }
+  return best;
+}
+
+// Les 4 prochains jours qui ont encore un lever ou un coucher à venir.
+const upcomingDays = () => [...new Set(upcoming().map((e) => e.d))].slice(0, 4);
+
 // Levers et couchers à venir (fenêtre pas encore terminée), dans l'ordre.
 function upcoming() {
   const r = state.result;
@@ -77,13 +94,9 @@ function upcoming() {
 }
 
 const dayShort = (d) => (d === 0 ? 'Auj.' : d === 1 ? 'Dem.' : cap(fmtWeekday.format(new Date(state.result.sunrise[d]))));
-function eventLabel(d, kind) {
-  const part = kind === 'rise' ? 'matin' : 'soir';
-  if (d === 0) return `Ce ${part}`;
-  if (d === 1) return `Demain ${part}`;
-  return `${cap(fmtWeekdayLong.format(new Date(state.result.sunrise[d])))} ${part}`;
-}
+const dayLabel = (d) => (d === 0 ? 'Aujourd’hui' : d === 1 ? 'Demain' : cap(fmtWeekdayLong.format(new Date(state.result.sunrise[d]))));
 const valleyName = (k) => VALLEYS[k].name.replace(/\s*\(.*\)/, '');
+const valleyTown = (k) => VALLEYS[k].name.match(/\((.*)\)/)?.[1] ?? VALLEYS[k].name;
 
 const hasSea = (d) => d?.top != null && d.seaCC >= 25;
 const inCloud = (s, d) => hasSea(d) && (d.top > s.alt + 20 || d.summitCC >= 50);
@@ -150,28 +163,28 @@ function renderHome(enter = false) {
     return;
   }
   const r = state.result;
-  const next = upcoming().slice(0, 2);
+  const days = upcomingDays();
 
-  // Meilleure occasion à venir, tous lieux confondus.
+  // Meilleure occasion des prochains jours, tous lieux confondus.
   let top = null;
   for (const s of SITES) {
-    for (const ev of upcoming()) {
-      const b = moment(s.id, ev.d, ev.kind);
-      if (b && (!top || b.score > top.b.score)) top = { s, ev, b };
+    for (const d of days) {
+      const b = dayScore(s.id, d);
+      if (b && (!top || b.score > top.b.score)) top = { s, d, b };
     }
   }
 
   const hero = top && top.b.score >= 20 ? (() => {
     const c = scoreClass(top.b.score);
-    const k = KINDS[top.ev.kind];
-    return `<button class="card hero tap" data-site="${top.s.id}" data-day="${top.ev.d}">
+    const k = KINDS[top.b.kind];
+    return `<button class="card hero tap" data-site="${top.s.id}" data-day="${top.d}">
       <div class="hero-scene">${scene(top.s, top.b.ref, c.key, { W: 360, H: 140, labels: false })}</div>
       <div class="hero-info">
         <p class="eyebrow">Meilleure chance</p>
         <div class="hero-row">
           <div class="hero-text">
             <h2 class="hero-site">${top.s.name}</h2>
-            <p class="hero-meta">${icon(k.icon)}${eventLabel(top.ev.d, top.ev.kind)} · ${k.label.toLowerCase()} ${hour(k.at(r, top.ev.d))}</p>
+            <p class="hero-meta">${icon(k.icon)}${dayLabel(top.d)} · ${k.label.toLowerCase()} ${hour(k.at(r, top.d))}</p>
             <p class="hero-verdict ${c.key}">${c.label}</p>
           </div>
           ${ring(top.b.score, c.key, 64)}
@@ -181,36 +194,34 @@ function renderHome(enter = false) {
   })() : `<div class="card hero">
       <div class="hero-scene">${scene(SITES[0], null, 'low', { W: 360, H: 140, labels: false })}</div>
       <div class="hero-info">
-        <p class="eyebrow">5 prochains jours</p>
+        <p class="eyebrow">${days.length} prochains jours</p>
         <h2 class="hero-site">Pas de mer de nuages en vue</h2>
         <p class="hero-meta">Aucune couche basse prévue sous les sommets.</p>
       </div>
     </div>`;
 
-  const rows = SITES.map((s) => {
-    const vals = next.map((ev) => {
-      const b = moment(s.id, ev.d, ev.kind);
-      const c = scoreClass(b?.score);
-      return `<span class="rs-val ${c.key}"><b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b><small>${c.label}</small></span>`;
-    }).join('');
-    const summary = next.map((ev) => `${eventLabel(ev.d, ev.kind)} ${moment(s.id, ev.d, ev.kind)?.score ?? '–'}`).join(', ');
-    return `<button class="row-site tap" data-site="${s.id}" data-day="${next[0]?.d ?? 0}" aria-label="${s.name}, ${summary}">
-      <span class="rs-name"><b>${s.name}</b><small>${s.alt} m</small></span>
-      ${vals}
-      ${icon('chevron', 'chev')}
-    </button>`;
-  }).join('');
+  const rows = SITES.map((s) => `<div class="row-site">
+      <button class="rs-name" data-site="${s.id}" data-day="${days[0]}"><b>${s.name}</b><small>${s.alt} m</small></button>
+      ${days.map((d) => {
+        const b = dayScore(s.id, d);
+        const c = scoreClass(b?.score);
+        return `<button class="rs-day ${c.key}" data-site="${s.id}" data-day="${d}" aria-label="${s.name}, ${dayLabel(d)} : ${b?.score ?? 'pas de données'}, ${c.label}">
+          <b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b></button>`;
+      }).join('')}
+    </div>`).join('');
 
   body.innerHTML = `
     ${hero}
     <section class="section">
       <div class="section-head list-head">
         <h2>Lieux</h2>
-        ${next.map((ev) => `<span class="col-lbl">${icon(KINDS[ev.kind].icon)}${eventLabel(ev.d, ev.kind)}</span>`).join('')}
-        <span></span>
+        ${days.map((d) => `<span class="col-lbl">${dayShort(d)}</span>`).join('')}
       </div>
       <div class="card list">${rows}</div>
-      <p class="footnote">Chance de mer de nuages, de 0 à 100, au meilleur moment autour du lever et du coucher du soleil.</p>
+      <div class="legend">
+        ${['top', 'good', 'maybe', 'low'].map((k) => `<span class="${k}"><i></i>${scoreClass({ top: 65, good: 40, maybe: 20, low: 0 }[k]).label}</span>`).join('')}
+      </div>
+      <p class="footnote">Meilleure chance de la journée, au lever ou au coucher du soleil, de 0 à 100.</p>
     </section>
     <section class="section">
       <div class="section-head"><h2>Webcams</h2></div>
@@ -260,21 +271,21 @@ function renderDetail(enter = false) {
     body.innerHTML = `${head}${state.error ? errorCard() : '<div class="card skel tall shimmer"></div><div class="card skel tall shimmer"></div>'}`;
     return;
   }
-  const r = state.result;
-  if (state.day == null || state.day >= r.sunrise.length) state.day = upcoming()[0]?.d ?? 0;
+  const days = upcomingDays();
+  if (!days.includes(state.day)) state.day = days[0] ?? 0;
 
-  const picker = r.sunrise.map((_, d) => {
-    const b = dayBest(s.id, d);
+  const picker = days.map((d) => {
+    const b = dayScore(s.id, d);
     const c = scoreClass(b?.score);
     return `<button class="seg tap ${c.key}" role="tab" data-day="${d}" aria-selected="${d === state.day}"
-        aria-label="${eventLabel(d, 'rise').replace(/ matin$/, '')} : jusqu’à ${b?.score ?? 'pas de données'}">
+        aria-label="${dayLabel(d)} : ${b?.score ?? 'pas de données'}">
       <span>${dayShort(d)}</span><b>${b?.score ?? '–'}</b></button>`;
   }).join('');
 
   body.innerHTML = `
     ${head}
-    <div class="segmented" role="tablist" aria-label="Jour" style="--n:${r.sunrise.length}">
-      <span class="seg-thumb" style="--k:${state.day}"></span>${picker}
+    <div class="segmented" role="tablist" aria-label="Jour" style="--n:${days.length}">
+      <span class="seg-thumb" style="--k:${days.indexOf(state.day)}"></span>${picker}
     </div>
     <div id="d-day" class="stack"></div>`;
   renderDay(enter);
@@ -296,11 +307,12 @@ function renderDay(enter = false) {
   const momentCard = (kind, m) => {
     const k = KINDS[kind];
     const mc = scoreClass(m?.score);
-    return `<div class="card moment ${mc.key}">
+    const past = isPast(d, kind);
+    return `<div class="card moment ${mc.key}${past ? ' past' : ''}">
       ${cardHead(k.icon, `${k.label} ${hour(k.at(r, d))}`)}
       <b class="m-score" data-count="${m?.score ?? ''}">${m?.score ?? '–'}</b>
       <p class="m-verdict">${mc.label}</p>
-      <p class="m-foot">${m ? `Idéal vers ${hour(m.time)}` : 'Pas de données'}</p>
+      <p class="m-foot">${past ? 'Passé' : m ? `Idéal vers ${hour(m.time)}` : 'Pas de données'}</p>
     </div>`;
   };
 
@@ -311,6 +323,7 @@ function renderDay(enter = false) {
       <span class="scene-cap">${icon(KINDS[bestKind].icon)}${bestKind === 'rise' ? 'Au lever' : 'Au coucher'}</span>
     </div>` : ''}
     ${compareCard(s, rise, set)}
+    ${cloudCard(s, d, best?.ref?.valley ?? s.valleys[0])}
     ${weatherCard(s, d)}
     <section class="section">
       <div class="section-head"><h2>Webcams proches</h2></div>
@@ -402,68 +415,108 @@ function weatherCard(s, d) {
       <div><small>Rafales</small><b>${int(day.gust)}<i> km/h</i></b></div>
       <div><small>Nuages</small><b>${int(cloud)}<i> %</i></b></div>
     </div>
-    ${meteogram(hours, state.result.sunrise[d], state.result.sunset[d], d === 0)}
   </div>`;
 }
 
-// Météogramme de la journée : nuages, température, pluie, lever et coucher.
-function meteogram(hours, sunrise, sunset, today) {
-  const W = 320, H = 176;
-  const x = (hh) => 8 + (hh / 24) * (W - 16);
-  const top = 30, bottom = 140;
-  const ts = hours.map((h) => h.t).filter((t) => t != null);
-  let tMin = Math.min(...ts), tMax = Math.max(...ts);
-  const mid = (tMin + tMax) / 2;
-  if (tMax - tMin < 6) { tMin = mid - 3; tMax = mid + 3; }
-  const yT = (t) => bottom - 14 - ((t - tMin) / (tMax - tMin)) * (bottom - top - 26);
-  const pMax = Math.max(2, ...hours.map((h) => h.precip ?? 0));
-  const hh = (t) => { const dt = new Date(t); return dt.getHours() + dt.getMinutes() / 60; };
+// Couverture nuageuse au fil de la journée, par altitude, au-dessus de la vallée de référence.
+function ccAt(levels, z) {
+  if (!levels.length) return null;
+  if (z <= levels[0].z) return levels[0].cc;
+  for (let k = 1; k < levels.length; k++) {
+    if (z <= levels[k].z) {
+      const a = levels[k - 1], b = levels[k];
+      return a.cc + ((z - a.z) / (b.z - a.z)) * (b.cc - a.cc);
+    }
+  }
+  return levels.at(-1).cc;
+}
 
-  const pts = hours.map((h, i) => (h.t == null ? null : [x(i + 0.5), yT(h.t)])).filter(Boolean);
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
-  const area = `${line} L${pts.at(-1)[0].toFixed(1)} ${bottom} L${pts[0][0].toFixed(1)} ${bottom} Z`;
-  const iMax = hours.findIndex((h) => h.t === Math.max(...ts));
-  const iMin = hours.findIndex((h) => h.t === Math.min(...ts));
-  const cw = (W - 16) / 24;
+// Teinte opaque entre le fond de carte (ciel clair) et le blanc (couvert) : pas de raccords visibles.
+function cloudColor(cc) {
+  const k = 0.1 + 0.9 * Math.min(1, cc / 100);
+  const mix = (a, b) => Math.round(a + (b - a) * k);
+  return `rgb(${mix(26, 238)},${mix(33, 241)},${mix(54, 251)})`;
+}
 
-  let g = `<svg class="mg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Météogramme : température de ${num(Math.min(...ts), '°')} à ${num(Math.max(...ts), '°')}, pluie ${num(hours.reduce((a, h) => a + (h.precip ?? 0), 0))} mm">
-    <defs><linearGradient id="mg-t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb340" stop-opacity=".35"/><stop offset="1" stop-color="#ffb340" stop-opacity="0"/></linearGradient></defs>`;
-  // Nuages : une case par heure, plus opaque quand c'est couvert.
+function cloudCard(s, d, valleyKey) {
+  const r = state.result;
+  const date = r.sunrise[d].slice(0, 10);
+  state.sections[valleyKey] ??= cloudSection(state.data, valleyKey, state.model);
+  const hours = state.sections[valleyKey].filter((h) => h.time.startsWith(date));
+  const rain = weatherFor(s.id).hourly.filter((h) => h.time.startsWith(date));
+  if (hours.length < 24) return '';
+
+  const W = 320, H = 216, x0 = 34, x1 = W - 4, top = 22, bottom = 170;
+  const cw = (x1 - x0) / 24;
+  const ph = bottom - top;
+  // Échelle verticale dilatée en bas : 0–1 500 m sur 65 % de la hauteur, 1 500–3 000 m au-dessus.
+  const y = (z) => (z <= 1500 ? bottom - (z / 1500) * 0.65 * ph : bottom - 0.65 * ph - ((Math.min(z, 3000) - 1500) / 1500) * 0.35 * ph);
+  const zAt = (py) => {
+    const u = (bottom - py) / ph;
+    return u <= 0.65 ? (u / 0.65) * 1500 : 1500 + ((u - 0.65) / 0.35) * 1500;
+  };
+  const xh = (t) => { const dt = new Date(t); return x0 + ((dt.getHours() + dt.getMinutes() / 60) / 24) * (x1 - x0); };
+  const ground = hours[0].ground;
+  const gy = y(ground);
+
+  let g = `<svg class="cs" viewBox="0 0 ${W} ${H}" role="img" aria-label="Couverture nuageuse par altitude au-dessus de ${valleyName(valleyKey)}, heure par heure">`;
+  // Cases de nuages : plus blanches quand la couverture est forte.
+  const step = 4;
+  g += '<g shape-rendering="crispEdges">';
   hours.forEach((h, i) => {
-    g += `<rect x="${(x(i) + 0.5).toFixed(1)}" y="4" width="${(cw - 1).toFixed(1)}" height="12" rx="2" class="mg-cloud" style="opacity:${(0.08 + 0.8 * (h.cc ?? 0) / 100).toFixed(2)}"/>`;
+    for (let py = top; py < gy; py += step) {
+      const z = zAt(py + step / 2);
+      if (z < ground) continue;
+      const cc = ccAt(h.levels, z);
+      if (cc == null || cc < 4) continue;
+      g += `<rect x="${(x0 + i * cw).toFixed(1)}" y="${py}" width="${(cw + 0.5).toFixed(1)}" height="${Math.min(step + 0.5, gy - py).toFixed(1)}" fill="${cloudColor(cc)}"/>`;
+    }
   });
-  // Lignes de repère toutes les 6 h.
-  for (const k of [6, 12, 18]) g += `<line x1="${x(k)}" x2="${x(k)}" y1="22" y2="${bottom}" class="mg-grid"/>`;
-  // Pluie.
-  hours.forEach((h, i) => {
+  g += '</g>';
+  // Graduations d'altitude.
+  for (const z of [500, 1000, 1500, 2000, 3000]) {
+    g += `<line x1="${x0}" x2="${x1}" y1="${y(z)}" y2="${y(z)}" class="cs-grid"/><text x="${x0 - 5}" y="${y(z) + 3.5}" class="cs-lbl end">${z}</text>`;
+  }
+  g += `<text x="${x0 - 5}" y="${top - 8}" class="cs-lbl end">m</text>`;
+  // Sol de la vallée.
+  g += `<rect x="${x0}" y="${gy.toFixed(1)}" width="${x1 - x0}" height="${(bottom - gy).toFixed(1)}" class="cs-ground"/>`;
+  // Lever, coucher, maintenant.
+  for (const [t, ic] of [[r.sunrise[d], 'sunrise'], [r.sunset[d], 'sunset']]) {
+    const sx = xh(t);
+    g += `<line x1="${sx}" x2="${sx}" y1="${top}" y2="${bottom}" class="cs-sun"/>`;
+    g += icon(ic, 'cs-ic').replace('<svg ', `<svg x="${(sx - 7).toFixed(1)}" y="3" width="14" height="14" `);
+  }
+  if (d === 0) {
+    const nx = xh(Date.now());
+    g += `<line x1="${nx}" x2="${nx}" y1="${top}" y2="${bottom}" class="cs-now"/>`;
+  }
+  // Altitude du sommet.
+  const sy = y(s.alt);
+  g += `<line x1="${x0}" x2="${x1}" y1="${sy}" y2="${sy}" class="cs-summit"/>
+    <text x="${x1 - 4}" y="${sy - 4}" class="cs-summit-lbl">${s.name} ${s.alt} m</text>`;
+  // Pluie au lieu.
+  const pMax = Math.max(2, ...rain.map((h) => h.precip ?? 0));
+  const rb = 196;
+  g += `<text x="${x0 - 5}" y="${rb - 3}" class="cs-lbl end">mm</text>`;
+  rain.forEach((h, i) => {
     if (!h.precip) return;
-    const ph = Math.max(2, (h.precip / pMax) * 44);
-    g += `<rect x="${(x(i) + 1.5).toFixed(1)}" y="${(bottom - ph).toFixed(1)}" width="${(cw - 3).toFixed(1)}" height="${ph.toFixed(1)}" rx="1.5" class="mg-rain"/>`;
+    const bh = Math.max(1.5, (h.precip / pMax) * 18);
+    g += `<rect x="${(x0 + i * cw + 1).toFixed(1)}" y="${(rb - bh).toFixed(1)}" width="${(cw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="1" class="cs-rain"/>`;
   });
-  // Lever et coucher.
-  for (const [t, ic] of [[sunrise, 'sunrise'], [sunset, 'sunset']]) {
-    const sx = x(hh(t));
-    g += `<line x1="${sx}" x2="${sx}" y1="22" y2="${bottom}" class="mg-sun"/>`;
-    g += icon(ic, 'mg-ic').replace('<svg ', `<svg x="${(sx - 7).toFixed(1)}" y="20" width="14" height="14" `);
-  }
-  if (today) {
-    const nx = x(hh(Date.now()));
-    g += `<line x1="${nx}" x2="${nx}" y1="22" y2="${bottom}" class="mg-now"/>`;
-  }
-  g += `<path d="${area}" fill="url(#mg-t)"/><path d="${line}" class="mg-temp"/>`;
-  for (const [i, below] of [[iMax, false], [iMin, true]]) {
-    if (i < 0) continue;
-    const [px, py] = [x(i + 0.5), yT(hours[i].t)];
-    g += `<circle cx="${px}" cy="${py}" r="3" class="mg-dot"/>
-      <text x="${Math.min(W - 14, Math.max(14, px))}" y="${below ? py + 15 : py - 8}" class="mg-val">${num(hours[i].t, '°')}</text>`;
-  }
-  g += `<line x1="8" x2="${W - 8}" y1="${bottom}" y2="${bottom}" class="mg-axis"/>`;
-  for (const k of [0, 6, 12, 18]) g += `<text x="${x(k) + (k ? 0 : 8)}" y="${bottom + 16}" class="mg-lbl">${String(k).padStart(2, '0')} h</text>`;
-  g += `<g class="mg-legend" transform="translate(8 ${H - 6})">
-    <rect y="-8" width="10" height="8" rx="2" class="mg-cloud" style="opacity:.6"/><text x="14">Nuages</text>
-    <line x1="72" x2="84" y1="-4" y2="-4" class="mg-temp"/><text x="88">Température</text>
-    <rect x="170" y="-8" width="8" height="8" rx="1.5" class="mg-rain"/><text x="182">Pluie (max ${num(pMax)} mm/h)</text></g>`;
-  return `${g}</svg>`;
+  g += `<line x1="${x0}" x2="${x1}" y1="${rb}" y2="${rb}" class="cs-grid"/>`;
+  for (const k of [0, 6, 12, 18]) g += `<text x="${x0 + (k / 24) * (x1 - x0) + (k ? 0 : 8)}" y="${H - 4}" class="cs-lbl">${String(k).padStart(2, '0')} h</text>`;
+  g += '</svg>';
+
+  return `<div class="card clouds">
+    ${cardHead('layers', 'Nuages par altitude')}
+    <p class="cs-sub">Au-dessus de ${valleyTown(valleyKey)} (vallée à ${Math.round(ground)} m), ${dayLabel(d).toLowerCase()}</p>
+    ${g}
+    <div class="cs-legend">
+      <span><i class="k-cloud"></i>Nuages (clair = couvert)</span>
+      <span><i class="k-summit"></i>Sommet</span>
+      <span><i class="k-rain"></i>Pluie (max ${num(pMax)} mm/h)</span>
+    </div>
+  </div>`;
 }
 
 function nearCams(s) {
@@ -562,7 +615,7 @@ function selectDay(d) {
   state.day = d;
   history.replaceState(history.state, '', `#/lieu/${state.site}/${d}`);
   $$('.segmented .seg').forEach((b) => b.setAttribute('aria-selected', String(Number(b.dataset.day) === d)));
-  $('.seg-thumb')?.style.setProperty('--k', d);
+  $('.seg-thumb')?.style.setProperty('--k', upcomingDays().indexOf(d));
   renderDay();
 }
 
@@ -750,6 +803,7 @@ function openCam(c) {
 function compute() {
   state.result = computeAll(state.data, state.model);
   state.weather = {};
+  state.sections = {};
 }
 
 async function load(force = false) {
@@ -785,6 +839,16 @@ document.addEventListener('visibilitychange', () => {
 
 $$('[data-action="settings"].icon-btn').forEach((b) => { b.innerHTML = icon('settings'); });
 $('.back-ic').innerHTML = icon('back');
+
+// Hauteur réelle de l'écran : en application installée, iOS donne parfois une fenêtre plus courte
+// que l'écran (bande vide en bas). On étend alors les pages à toute la hauteur.
+function fitScreen() {
+  const portrait = innerHeight >= innerWidth;
+  const h = standalone && portrait ? Math.max(innerHeight, screen.height) : innerHeight;
+  document.documentElement.style.setProperty('--app-h', `${h}px`);
+}
+fitScreen();
+addEventListener('resize', fitScreen);
 
 document.documentElement.classList.add('no-anim');
 route();
