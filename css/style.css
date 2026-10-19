@@ -518,10 +518,10 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 
 /* Conditions au lever et au coucher : une voie teintée par moment (doré / violet) */
 .cmp-card { padding-bottom: var(--sp-3); }
-.cmp-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; column-gap: 6px; align-items: stretch; min-height: 44px; }
+.cmp-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); column-gap: 6px; align-items: stretch; min-height: 44px; }
 .cmp-row + .cmp-row .cmp-lbl { border-top: 1px solid var(--sep); }
 .cmp-head { min-height: 0; font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-2); }
-.cmp-head > span { display: flex; align-items: center; gap: 6px; padding: 0 0 var(--sp-2); }
+.cmp-head > span { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 0 var(--sp-2); white-space: nowrap; }
 .cmp-head .ic { width: 15px; height: 15px; }
 .cmp-head .lane { padding: 10px var(--sp-2) var(--sp-2); border-radius: 12px 12px 0 0; }
 .cmp-head .lane.rise { color: var(--rise); }
