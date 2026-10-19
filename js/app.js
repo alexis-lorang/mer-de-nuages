@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=12';
-import { icon } from './icons.js?v=12';
-import { scene } from './scene.js?v=12';
+} from './forecast.js?v=13';
+import { icon } from './icons.js?v=13';
+import { scene } from './scene.js?v=13';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -34,10 +34,12 @@ const state = {
   model: store.get('mdn-model', 'consensus'),
   daylight: store.get('mdn-daylight', '0') === '1',
   cloudView: store.get('mdn-cloud-view', 'days'),
+  homeDays: Number(store.get('mdn-home-days', '4')),
   site: null,
   day: null,
 };
 if (!MODELS[state.model]) state.model = 'consensus';
+if (![2, 4, 7].includes(state.homeDays)) state.homeDays = 4;
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
@@ -77,8 +79,10 @@ function dayScore(siteId, d) {
   return best;
 }
 
-// Les 4 prochains jours qui ont encore un lever ou un coucher à venir.
-const upcomingDays = () => [...new Set(upcoming().map((e) => e.d))].slice(0, 4);
+// Les n prochains jours qui ont encore un lever ou un coucher à venir.
+const upcomingDays = (n = 4) => [...new Set(upcoming().map((e) => e.d))].slice(0, n);
+// Jours proposés sur la page d'un lieu : au moins 4, ou autant que sur l'accueil.
+const detailDays = () => upcomingDays(Math.max(4, state.homeDays));
 
 // Levers et couchers à venir (fenêtre pas encore terminée), dans l'ordre.
 function upcoming() {
@@ -164,7 +168,8 @@ function renderHome(enter = false) {
     return;
   }
   const r = state.result;
-  const days = upcomingDays();
+  const N = state.homeDays;
+  const days = upcomingDays(N);
 
   // Meilleure occasion des prochains jours, tous lieux confondus.
   let top = null;
@@ -201,28 +206,47 @@ function renderHome(enter = false) {
       </div>
     </div>`;
 
-  const rows = SITES.map((s) => `<div class="row-site">
+  // Colonnes : lever et coucher séparés sur 2 jours, meilleur moment du jour sur 4 et 7 jours.
+  const cols = N === 2 ? days.flatMap((d) => [{ d, kind: 'rise' }, { d, kind: 'set' }]) : days.map((d) => ({ d }));
+  const wide = N === 7;
+  const cell = (s, { d, kind }) => {
+    const b = kind ? moment(s.id, d, kind) : dayScore(s.id, d);
+    const k = kind ?? b?.kind;
+    const past = kind && isPast(d, kind);
+    const c = scoreClass(b?.score);
+    const when = kind ? `${KINDS[kind].label.toLowerCase()}` : k ? `au ${KINDS[k].label.toLowerCase()}` : '';
+    return `<button class="rs-day ${c.key}${past ? ' past' : ''}" data-site="${s.id}" data-day="${d}"
+        aria-label="${s.name}, ${dayLabel(d)} ${when}${past ? ' (passé)' : ''} : ${b?.score ?? 'pas de données'}, ${c.label}">
+      <b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b>${!kind && k ? icon(KINDS[k].icon, 'rs-k') : ''}</button>`;
+  };
+  const rows = SITES.map((s) => `<div class="row-site${wide ? ' wide' : ''}">
       <button class="rs-name" data-site="${s.id}" data-day="${days[0]}"><b>${s.name}</b><small>${s.alt} m</small></button>
-      ${days.map((d) => {
-        const b = dayScore(s.id, d);
-        const c = scoreClass(b?.score);
-        return `<button class="rs-day ${c.key}" data-site="${s.id}" data-day="${d}" aria-label="${s.name}, ${dayLabel(d)} : ${b?.score ?? 'pas de données'}, ${c.label}">
-          <b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b></button>`;
-      }).join('')}
+      ${wide ? `<div class="rs-days">${cols.map((c) => cell(s, c)).join('')}</div>` : cols.map((c) => cell(s, c)).join('')}
     </div>`).join('');
+
+  const head = N === 2
+    ? `<div class="cols-head two"><span></span>${days.map((d) => `<span class="col-lbl span2">${dayLabel(d)}</span>`).join('')}
+        <span></span>${cols.map(({ kind }) => `<span class="col-ic" title="${KINDS[kind].label}">${icon(KINDS[kind].icon)}</span>`).join('')}</div>`
+    : `<div class="cols-head${wide ? ' wide' : ''}">${wide ? '' : '<span></span>'}${days.map((d) => `<span class="col-lbl">${dayShort(d)}</span>`).join('')}</div>`;
+  const note = N === 2
+    ? 'Chance de mer de nuages au lever et au coucher du soleil, de 0 à 100. Les moments passés sont grisés.'
+    : `Meilleure chance de la journée, de 0 à 100 ; l’icône indique si c’est au lever ou au coucher.${N === 7 ? ' Au-delà de 4 jours, seul le modèle ICON est disponible : prévision moins sûre.' : ''}`;
 
   body.innerHTML = `
     ${hero}
     <section class="section">
-      <div class="section-head list-head">
+      <div class="section-head with-seg">
         <h2>Lieux</h2>
-        ${days.map((d) => `<span class="col-lbl">${dayShort(d)}</span>`).join('')}
+        <div class="mini-seg compact" role="tablist" aria-label="Nombre de jours">
+          ${[2, 4, 7].map((k) => `<button role="tab" data-homedays="${k}" aria-selected="${k === N}">${k} jours</button>`).join('')}
+        </div>
       </div>
+      ${head}
       <div class="card list">${rows}</div>
       <div class="legend">
         ${['top', 'good', 'maybe', 'low'].map((k) => `<span class="${k}"><i></i>${scoreClass({ top: 65, good: 40, maybe: 20, low: 0 }[k]).label}</span>`).join('')}
       </div>
-      <p class="footnote">Meilleure chance de la journée, au lever ou au coucher du soleil, de 0 à 100.</p>
+      <p class="footnote">${note}</p>
     </section>
     <section class="section">
       <div class="section-head"><h2>Webcams</h2></div>
@@ -272,7 +296,7 @@ function renderDetail(enter = false) {
     body.innerHTML = `${head}${state.error ? errorCard() : '<div class="card skel tall shimmer"></div><div class="card skel tall shimmer"></div>'}`;
     return;
   }
-  const days = upcomingDays();
+  const days = detailDays();
   if (!days.includes(state.day)) state.day = days[0] ?? 0;
 
   const picker = days.map((d) => {
@@ -658,6 +682,16 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
   </div>`;
 }
 
+function setHomeDays(n) {
+  if (n === state.homeDays) return;
+  state.homeDays = n;
+  store.set('mdn-home-days', String(n));
+  const sc = $('#home .scroller');
+  const y = sc.scrollTop;
+  renderHome();
+  sc.scrollTop = y;
+}
+
 function setCloudView(view) {
   if (view === state.cloudView) return;
   state.cloudView = view;
@@ -768,17 +802,18 @@ function selectDay(d) {
   state.day = d;
   history.replaceState(history.state, '', `#/lieu/${state.site}/${d}`);
   $$('.segmented .seg').forEach((b) => b.setAttribute('aria-selected', String(Number(b.dataset.day) === d)));
-  $('.seg-thumb')?.style.setProperty('--k', upcomingDays().indexOf(d));
+  $('.seg-thumb')?.style.setProperty('--k', detailDays().indexOf(d));
   renderDay();
 }
 
 // Délégation des clics.
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview]');
+  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-homedays]');
   if (!t) return;
   if (t.dataset.cam) return openCam(WEBCAMS.find((c) => c.id === Number(t.dataset.cam)));
   if (t.dataset.model) return setModel(t.dataset.model);
   if (t.dataset.cloudview) return setCloudView(t.dataset.cloudview);
+  if (t.dataset.homedays) return setHomeDays(Number(t.dataset.homedays));
   if (t.dataset.site) return openSite(t.dataset.site, Number(t.dataset.day));
   if (t.dataset.day && t.closest('.segmented')) return selectDay(Number(t.dataset.day));
   switch (t.dataset.action) {
@@ -970,7 +1005,7 @@ async function load(force = false) {
     state.data = await fetchForecast({ force });
     const first = !state.result;
     compute();
-    $('#updated').textContent = `Vosges du Nord · prévisions de ${hour(state.data.at)}`;
+    $('#updated').textContent = `Vosges du Nord · prévisions de ${hour(state.data.at)}${state.data.stale ? ' (service indisponible, anciennes données)' : ''}`;
     renderHome(first || force);
     if (onDetail) renderDetail(first || force);
   } catch (e) {

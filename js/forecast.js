@@ -10,7 +10,7 @@ const SURFACE = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visi
 const WEATHER = ['weather_code', 'precipitation', 'cloud_cover', 'wind_gusts_10m', 'wind_direction_10m'];
 const DAILY = ['sunrise', 'sunset', 'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max'];
 const ALL_MODELS = MODELS.consensus.ids;
-const CACHE_KEY = 'mdn-forecast-v4';
+const CACHE_KEY = 'mdn-forecast-v5';
 const CACHE_TTL = 30 * 60 * 1000;
 
 function hourlyVars() {
@@ -38,7 +38,15 @@ export async function fetchForecast({ force = false } = {}) {
   const locs = locations();
   // Une requête par modèle (une requête unique dépasse le délai du serveur),
   // puis fusion avec des clés suffixées par le modèle.
-  const perModel = await Promise.all(ALL_MODELS.map((m) => fetchModel(locs, m)));
+  let perModel;
+  try {
+    perModel = await Promise.all(ALL_MODELS.map((m) => fetchModel(locs, m)));
+  } catch (e) {
+    // Service indisponible : on garde les dernières prévisions connues, même anciennes.
+    const old = staleCache();
+    if (old) return { ...old, stale: true };
+    throw e;
+  }
   const raw = {};
   locs.forEach((l, i) => {
     const loc = { elevation: perModel[0][i].elevation, hourly: { time: perModel[0][i].hourly.time }, daily: { time: perModel[0][i].daily.time } };
@@ -61,7 +69,7 @@ async function fetchModel(locs, model, attempt = 1) {
     hourly: hourlyVars().join(','),
     daily: DAILY.join(','),
     models: model,
-    forecast_days: '5',
+    forecast_days: '8',
     timezone: 'Europe/Paris',
   });
   try {
@@ -71,9 +79,23 @@ async function fetchModel(locs, model, attempt = 1) {
     if (json.error) throw new Error(json.reason);
     return Array.isArray(json) ? json : [json];
   } catch (e) {
-    if (attempt < 3) return fetchModel(locs, model, attempt + 1);
+    // Nouvel essai après une pause croissante (le service est parfois surchargé quelques secondes).
+    if (attempt < 4) {
+      await new Promise((r) => setTimeout(r, 1500 * 2 ** (attempt - 1)));
+      return fetchModel(locs, model, attempt + 1);
+    }
     throw new Error(`Open-Meteo (${model}) : ${e.message}`);
   }
+}
+
+function staleCache() {
+  for (const key of [CACHE_KEY, 'mdn-forecast-v4']) {
+    try {
+      const c = JSON.parse(localStorage.getItem(key));
+      if (c?.raw) return c;
+    } catch { /* cache illisible */ }
+  }
+  return null;
 }
 
 // ---------- Profils verticaux ----------

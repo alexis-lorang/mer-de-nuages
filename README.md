@@ -1,6 +1,6 @@
 # Mers de nuages · Vosges du Nord
 
-Application web statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 5 jours pour :
+Application web statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 7 jours pour :
 Donon, Rocher de Mutzig, Rocher de Dabo, Col du Valsberg et Château du Haut-Barr.
 
 ## Lancer
@@ -21,9 +21,10 @@ Puis ouvrir http://localhost:8765. Un serveur est nécessaire, car les modules E
 Application web pensée pour iPhone, au style d’iOS. Sur iPhone : Safari → Partager → « Sur l’écran d’accueil »
 pour l’ouvrir en plein écran comme une app.
 
-- **Accueil** : la meilleure chance à venir, puis la liste des lieux avec l’indice des 4 prochains jours
-  (meilleur moment de la journée, lever ou coucher). Toucher un jour ouvre la page du lieu sur ce jour.
-  Tirer vers le bas pour actualiser.
+- **Accueil** : la meilleure chance à venir, puis la liste des lieux avec un sélecteur « 2 · 4 · 7 jours ».
+  Sur 2 jours, l’indice du lever et du coucher séparément (moments passés grisés) ; sur 4 et 7 jours, la meilleure
+  chance de la journée, avec une icône indiquant si c’est au lever ou au coucher. Toucher une case ouvre la page
+  du lieu sur ce jour. Tirer vers le bas pour actualiser.
 - **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages) ;
   tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
   inversion, vent, accord des modèles) ; nuages par altitude sur 3 jours au-dessus de la vallée de référence
@@ -44,6 +45,8 @@ restants viennent des modèles (meteoblue utilise son propre mélange).
 
 Calculé heure par heure à partir des profils verticaux (niveaux 1000 → 700 hPa) d’Open-Meteo,
 modèles ICON (DWD) et AROME/ARPEGE (Météo-France), ou leur moyenne (« consensus »).
+AROME/ARPEGE s’arrête vers le 5ᵉ jour : au-delà, l’indice repose sur ICON seul.
+Si Open-Meteo ne répond pas (surcharge), l’app réessaie avec des pauses puis affiche les dernières prévisions en cache.
 
 Pour chaque site, on teste plusieurs vallées de référence (plateau lorrain, Bruche, plaine d’Alsace, Mossig, Zorn…)
 et on garde la meilleure :

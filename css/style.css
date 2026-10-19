@@ -218,11 +218,18 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 .ring-val { fill: none; stroke: var(--c); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1.2s var(--ease-ios) .2s; }
 .ring b { font: 600 22px/1 var(--font-round); font-variant-numeric: tabular-nums; }
 
-/* Liste des lieux : une colonne par jour */
+/* Liste des lieux : une colonne par jour (ou par lever / coucher sur 2 jours) */
 .list { padding: 0; }
-.list-head, .row-site { display: grid; grid-template-columns: 1fr repeat(4, 44px); gap: var(--sp-1); align-items: center; }
-.list-head { align-items: end; padding: 0 var(--sp-2) 0 var(--sp-1); }
-.col-lbl { font-size: 13px; font-weight: 600; text-align: center; color: var(--text-2); }
+.section-head.with-seg { align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.mini-seg.compact { width: 196px; flex: none; }
+.mini-seg.compact button { height: 30px; font-size: 12px; }
+.cols-head, .row-site { display: grid; grid-template-columns: 1fr repeat(4, 44px); gap: var(--sp-1); align-items: center; }
+.cols-head { align-items: end; padding: 0 var(--sp-2) 0 var(--sp-1); row-gap: 2px; }
+.cols-head.wide { grid-template-columns: repeat(7, 1fr); padding: 0 13px; }
+.col-lbl { font-size: 13px; font-weight: 600; text-align: center; color: var(--text-2); white-space: nowrap; }
+.col-lbl.span2 { grid-column: span 2; color: var(--text); }
+.col-ic { display: grid; place-items: center; color: var(--text-2); }
+.col-ic .ic { width: 16px; height: 16px; }
 .row-site { position: relative; width: 100%; min-height: 64px; padding: var(--sp-2) var(--sp-2) var(--sp-2) 0; }
 .row-site + .row-site::before { content: ""; position: absolute; top: 0; left: var(--sp-4); right: 0; border-top: 1px solid var(--sep); }
 .rs-name {
@@ -233,14 +240,21 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 .rs-name:active { background: var(--card-hi); }
 .rs-name b { font-size: 16px; line-height: 21px; font-weight: 600; }
 .rs-name small { margin-top: 1px; font-size: 13px; color: var(--text-2); }
+.row-site.wide { display: block; padding: 10px var(--sp-3) var(--sp-3); }
+.row-site.wide .rs-name { flex-direction: row; align-items: baseline; gap: 6px; margin: 0 0 var(--sp-2); padding: 2px var(--sp-1); border-radius: 8px; }
+.rs-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--sp-1); }
 .rs-day {
-  display: grid; place-items: center; height: 44px; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  height: 44px; border-radius: 12px;
   background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c);
   transition: transform .4s var(--spring), background-color .2s;
 }
 .rs-day.low, .rs-day.na { background: var(--fill); }
+.rs-day.past { opacity: .4; }
 .rs-day:active { transform: scale(.92); }
 .rs-day b { font: 600 19px/1 var(--font-round); font-variant-numeric: tabular-nums; }
+.rs-day:has(.rs-k) b { font-size: 17px; }
+.rs-k { width: 12px; height: 12px; opacity: .8; }
 .legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); padding: var(--sp-1) var(--sp-1) 0; font-size: 12px; color: var(--text-2); }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
