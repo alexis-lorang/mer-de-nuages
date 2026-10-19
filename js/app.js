@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage,
-} from './config.js?v=38';
+} from './config.js?v=39';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=38';
-import { icon } from './icons.js?v=38';
-import { scene } from './scene.js?v=38';
+} from './forecast.js?v=39';
+import { icon } from './icons.js?v=39';
+import { scene } from './scene.js?v=39';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -595,16 +595,6 @@ const cloudWord = (cc) => CLOUD_LEVELS.find(([min]) => cc >= min)?.[1] ?? null; 
 // Altitudes : les basses couches (là où se forment les mers de nuages) occupent l'essentiel de la hauteur.
 const Z_TICKS = [0, 500, 1000, 1500, 2000, 3000, 6000, 12000];
 
-// Bruit de valeur lissé (déterministe) : donne aux bords des nuages un relief cotonneux.
-function valueNoise(x, y) {
-  const h = (i, j) => { const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return n - Math.floor(n); };
-  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
-  const sx = xf * xf * (3 - 2 * xf), sy = yf * yf * (3 - 2 * yf);
-  const a = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * sx;
-  const b = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * sx;
-  return a + (b - a) * sy;
-}
-
 // Flou par boîtes répétées (proche d'un flou gaussien) sur un champ W × H.
 function blurField(f, W, H, r, passes = 3) {
   const tmp = new Float32Array(f.length);
@@ -629,8 +619,8 @@ function blurField(f, W, H, r, passes = 3) {
   }
 }
 
-// Image de la coupe : couverture interpolée en temps et en altitude, lissée, puis colorée par niveau
-// avec des bords fondus (les nuages fins laissent voir le ciel). Les colonnes couvrent [tStart, tEnd] (ms).
+// Image de la coupe : couverture interpolée en temps et en altitude, floutée pour arrondir les angles,
+// puis colorée par niveau avec des bords nets mais doux. Les colonnes couvrent [tStart, tEnd] (ms).
 function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
   const k = Math.min(3, Math.max(2, devicePixelRatio || 2));
   const W = Math.round(w * k), H = Math.round(h * k);
@@ -660,14 +650,11 @@ function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
   for (let py = 0; py < H; py++) {
     if (gy >= 0 && py >= gy) break;
     for (let px = 0; px < W; px++) {
-      // Relief : ±7 % de couverture selon un bruit à deux échelles.
-      const v = field[py * W + px]
-        + 9 * (valueNoise(px / (9 * k), py / (5 * k)) - 0.5)
-        + 5 * (valueNoise(px / (3.5 * k) + 50, py / (2.5 * k)) - 0.5);
-      const alpha = smooth(14, 26, v);
+      const v = field[py * W + px];
+      const alpha = smooth(17, 23, v);
       if (alpha <= 0) continue;
-      let c = mix(few, cloudy, smooth(45, 55, v));
-      c = mix(c, over, smooth(75, 85, v));
+      let c = mix(few, cloudy, smooth(47, 53, v));
+      c = mix(c, over, smooth(77, 83, v));
       const o = (py * W + px) * 4;
       img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = Math.round(alpha * 255);
     }
