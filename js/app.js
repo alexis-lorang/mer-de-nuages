@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage,
-} from './config.js?v=39';
+} from './config.js?v=40';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=39';
-import { icon } from './icons.js?v=39';
-import { scene } from './scene.js?v=39';
+} from './forecast.js?v=40';
+import { icon } from './icons.js?v=40';
+import { scene } from './scene.js?v=40';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -619,8 +619,9 @@ function blurField(f, W, H, r, passes = 3) {
   }
 }
 
-// Image de la coupe : couverture interpolée en temps et en altitude, floutée pour arrondir les angles,
-// puis colorée par niveau avec des bords nets mais doux. Les colonnes couvrent [tStart, tEnd] (ms).
+// Image de la coupe : couverture interpolée en temps et en altitude, floutée pour arrondir les angles.
+// Contour net (anticrénelé selon la pente du champ, ~1 px), intérieur en fondu entre les niveaux,
+// calculé sur une copie plus floutée. Les colonnes couvrent [tStart, tEnd] (ms).
 function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
   const k = Math.min(3, Math.max(2, devicePixelRatio || 2));
   const W = Math.round(w * k), H = Math.round(h * k);
@@ -636,11 +637,14 @@ function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
     for (let py = 0; py < H; py++) field[py * W + px] = grid[i0][py] + (grid[i1][py] - grid[i0][py]) * f;
   }
   blurField(field, W, H, Math.round(3 * k));
+  const tone = field.slice();
+  blurField(tone, W, H, Math.round(4 * k));
 
   const pal = cloudBins().map(([, c]) => c.match(/\d+/g).map(Number)); // couvert, nuageux, quelques
   const [over, cloudy, few] = pal;
   const smooth = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
   const mix = (c1, c2, u) => [0, 1, 2].map((i) => c1[i] + (c2[i] - c1[i]) * u);
+  const EDGE = 20, AA = 0.9 * k; // seuil du contour, largeur de l'anticrénelage (px image)
 
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
@@ -650,12 +654,18 @@ function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
   for (let py = 0; py < H; py++) {
     if (gy >= 0 && py >= gy) break;
     for (let px = 0; px < W; px++) {
-      const v = field[py * W + px];
-      const alpha = smooth(17, 23, v);
+      const i = py * W + px;
+      const v = field[i];
+      if (v < EDGE - 12) continue;
+      // Distance au contour ≈ écart au seuil / pente locale : bord de largeur constante.
+      const gx = (field[i + (px < W - 1 ? 1 : 0)] - field[i - (px > 0 ? 1 : 0)]) / 2;
+      const gyv = (field[i + (py < H - 1 ? W : 0)] - field[i - (py > 0 ? W : 0)]) / 2;
+      const alpha = Math.min(1, Math.max(0, 0.5 + (v - EDGE) / (Math.hypot(gx, gyv) * AA + 1e-3)));
       if (alpha <= 0) continue;
-      let c = mix(few, cloudy, smooth(47, 53, v));
-      c = mix(c, over, smooth(77, 83, v));
-      const o = (py * W + px) * 4;
+      const t = Math.max(tone[i], v * 0.85);
+      let c = mix(few, cloudy, smooth(34, 64, t));
+      c = mix(c, over, smooth(64, 94, t));
+      const o = i * 4;
       img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = Math.round(alpha * 255);
     }
   }
