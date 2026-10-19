@@ -372,23 +372,35 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 /* Nuages par altitude */
 .cs-sub { margin: calc(-1 * var(--sp-2)) 0 var(--sp-2); font-size: 13px; color: var(--text-2); }
 .cs { display: block; width: 100%; height: auto; overflow: visible; }
-.cs-day { fill: rgba(255, 255, 255, .045); }
-.cs-sep { stroke: rgba(255, 255, 255, .18); stroke-width: 1; }
+.cs-night { fill: #0b0f1d; }
+.cs-day { fill: #1b2444; }
+.cs-ground { fill: #2a2f45; }
+.cs-grid { stroke: rgba(255, 255, 255, .07); stroke-width: 1; }
+.cs-axis { stroke: rgba(255, 255, 255, .2); stroke-width: 1; }
+.cs-sunline { stroke: rgba(255, 211, 107, .45); stroke-width: 1; stroke-dasharray: 2 3; }
+.cs-midnight { stroke: rgba(255, 255, 255, .5); stroke-width: 1.2; }
 .cs-dayname { font: 600 11px var(--font); fill: var(--text-2); text-anchor: middle; }
 .cs-dayname.on { fill: var(--text); }
-.cs-grid { stroke: var(--sep); stroke-width: 1; }
-.cs-ground { fill: #262d45; }
-.cs-sun { stroke: rgba(255, 214, 10, .55); stroke-width: 1; stroke-dasharray: 3 3; }
-.cs svg.cs-ic { width: 14px; height: 14px; color: #ffd60a; }
-.cs-now { stroke: rgba(255, 255, 255, .75); stroke-width: 1; stroke-dasharray: 2 2; }
+.cs-bar-night { fill: #232b47; }
+.cs-now { stroke: #fff; stroke-width: 1; stroke-dasharray: 2 2; opacity: .8; }
+.cs-now-dot { fill: #fff; }
 .cs-summit { stroke: var(--c-top); stroke-width: 1.5; stroke-dasharray: 5 3; }
-.cs-summit-lbl { font: 600 10px var(--font); fill: var(--c-top); text-anchor: end; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.cs-summit-lbl { font: 600 10px var(--font); fill: var(--c-top); text-anchor: end; paint-order: stroke; stroke: #0d1222; stroke-width: 3px; stroke-linejoin: round; }
 .cs-rain { fill: #4fa8ff; }
-.cs-lbl { font: 500 10px var(--font); fill: var(--text-2); text-anchor: middle; }
+.cs-lbl { font: 500 9.5px var(--font); fill: var(--text-2); text-anchor: middle; font-variant-numeric: tabular-nums; }
 .cs-lbl.end { text-anchor: end; }
-.cs-legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-3); font-size: 12px; color: var(--text-2); }
+.cs-lbl.unit { fill: var(--text-3); }
+
+.cs-scale { display: flex; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-4); }
+.cs-scale-title { padding-top: 1px; font-size: 12px; color: var(--text-2); }
+.cs-scale-body { flex: 1; }
+.cs-scale-bar { display: grid; grid-template-columns: repeat(5, 1fr); height: 10px; overflow: hidden; border-radius: 5px; }
+.cs-scale-ticks { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cs-legend { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin-top: var(--sp-3); font-size: 12px; color: var(--text-2); }
 .cs-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.cs-legend i { display: inline-block; width: 12px; height: 8px; border-radius: 2px; }
+.cs-legend i { display: inline-block; width: 14px; height: 8px; border-radius: 4px; }
+.k-day { background: linear-gradient(90deg, #ff9f6a, #ffd36b 40%, #ffd36b 60%, #ff9f6a); }
+.k-night { background: #232b47; border: 1px solid rgba(255, 255, 255, .15); }
 .k-summit { height: 0 !important; border-top: 2px dashed var(--c-top); border-radius: 0 !important; }
 .k-rain { background: #4fa8ff; }
 

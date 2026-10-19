@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=7';
-import { icon } from './icons.js?v=7';
-import { scene } from './scene.js?v=7';
+} from './forecast.js?v=10';
+import { icon } from './icons.js?v=10';
+import { scene } from './scene.js?v=10';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -432,7 +432,7 @@ function ccAt(levels, z) {
 }
 
 // Classes de couverture reprises de meteoblue : 10–25, 25–50, 50–75, 75–90, 90–100 %.
-const CLOUD_BINS = [[90, 'rgb(240,243,252)'], [75, 'rgb(196,203,224)'], [50, 'rgb(146,155,184)'], [25, 'rgb(98,108,140)'], [10, 'rgb(62,71,102)']];
+const CLOUD_BINS = [[90, 'rgb(244,246,253)'], [75, 'rgb(203,210,231)'], [50, 'rgb(160,169,198)'], [25, 'rgb(118,128,162)'], [10, 'rgb(82,92,128)']];
 const cloudColor = (cc) => CLOUD_BINS.find(([min]) => cc >= min)?.[1] ?? null;
 
 // Échelle d'altitude de meteoblue (0 · 1,5 · 3,5 · 6 · 9 · 14 km), détaillée sous 1,5 km pour les mers de nuages.
@@ -468,6 +468,9 @@ function cloudRaster(hours, ground, zAtRow, w, h) {
   return cv.toDataURL();
 }
 
+const dayHead = (d) => (d === 0 ? 'Aujourd’hui' : d === 1 ? 'Demain'
+  : `${cap(fmtWeekday.format(new Date(state.result.sunrise[d])))} ${new Date(state.result.sunrise[d]).getDate()}`);
+
 function cloudCard(s, d, valleyKey) {
   const r = state.result;
   state.sections[valleyKey] ??= cloudSection(state.data, valleyKey, state.model);
@@ -477,8 +480,13 @@ function cloudCard(s, d, valleyKey) {
   const rain = weatherFor(s.id).hourly.filter((h) => dates.includes(h.time.slice(0, 10)));
   if (hours.length < 24) return '';
 
+  // Mise en page : noms des jours, bande jour/nuit, coupe des nuages, pluie, heures.
   const n = hours.length;
-  const W = 320, H = 232, x0 = 34, x1 = W - 4, top = 26, bottom = 182;
+  const W = 320, x0 = 30, x1 = W - 2;
+  const nameY = 11, barY = 19, barH = 8;
+  const top = 36, bottom = 216;
+  const rainTop = 224, rainB = 242;
+  const H = 260;
   const cw = (x1 - x0) / n;
   const seg = (bottom - top) / (Z_TICKS.length - 1);
   const y = (z) => {
@@ -494,60 +502,108 @@ function cloudCard(s, d, valleyKey) {
   };
   const t0 = new Date(hours[0].time).getTime();
   const xt = (t) => x0 + ((new Date(t).getTime() - t0) / 3600e3) * cw;
+  const dayX = (k) => x0 + k * 24 * cw;
   const ground = hours[0].ground;
   const gy = y(ground);
+  const days = dates.map((date) => r.sunrise.findIndex((t) => t.startsWith(date)));
+  const f = (v) => v.toFixed(1);
 
-  let g = `<svg class="cs" viewBox="0 0 ${W} ${H}" role="img" aria-label="Couverture nuageuse par altitude au-dessus de ${valleyTown(valleyKey)}, sur trois jours">`;
-  // Journée en bande plus claire, nom des jours en haut.
-  dates.forEach((date, k) => {
-    const i = r.sunrise.findIndex((t) => t.startsWith(date));
-    const sx = xt(r.sunrise[i]), ex = xt(r.sunset[i]);
-    g += `<rect x="${sx.toFixed(1)}" y="${top}" width="${(ex - sx).toFixed(1)}" height="${bottom - top}" class="cs-day"/>`;
-    const dx = x0 + (k * 24 + 12) * cw;
-    g += `<text x="${dx.toFixed(1)}" y="${top - 10}" class="cs-dayname${k === 0 ? ' on' : ''}">${dayLabel(i)}</text>`;
-    if (k) g += `<line x1="${(x0 + k * 24 * cw).toFixed(1)}" x2="${(x0 + k * 24 * cw).toFixed(1)}" y1="${top}" y2="${bottom}" class="cs-sep"/>`;
+  let g = `<svg class="cs" viewBox="0 0 ${W} ${H}" role="img" aria-label="Couverture nuageuse par altitude au-dessus de ${valleyTown(valleyKey)}, sur trois jours">
+    <defs>
+      <linearGradient id="cs-dawn" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#ff9f6a"/><stop offset=".25" stop-color="#ffd36b"/>
+        <stop offset=".75" stop-color="#ffd36b"/><stop offset="1" stop-color="#ff9f6a"/>
+      </linearGradient>
+      <clipPath id="cs-plot"><rect x="${x0}" y="${top}" width="${x1 - x0}" height="${bottom - top}" rx="6"/></clipPath>
+    </defs>`;
+
+  // Fond de la coupe : nuit sombre, jour plus clair (visible là où il n'y a pas de nuages).
+  g += `<g clip-path="url(#cs-plot)"><rect x="${x0}" y="${top}" width="${x1 - x0}" height="${bottom - top}" class="cs-night"/>`;
+  days.forEach((i) => {
+    g += `<rect x="${f(xt(r.sunrise[i]))}" y="${top}" width="${f(xt(r.sunset[i]) - xt(r.sunrise[i]))}" height="${bottom - top}" class="cs-day"/>`;
   });
-  // Nuages lissés (interpolés en temps et en altitude), dessinés en image.
-  g += `<image x="${x0}" y="${top}" width="${x1 - x0}" height="${(gy - top).toFixed(1)}" preserveAspectRatio="none"
+  g += `<image x="${x0}" y="${top}" width="${x1 - x0}" height="${f(gy - top)}" preserveAspectRatio="none"
     href="${cloudRaster(hours, ground, (py) => zAt(top + py), x1 - x0, gy - top)}"/>`;
-  // Graduations.
+  g += `<rect x="${x0}" y="${f(gy)}" width="${x1 - x0}" height="${f(bottom - gy)}" class="cs-ground"/>`;
+  // Graduations d'altitude.
+  for (const z of Z_TICKS.slice(1)) g += `<line x1="${x0}" x2="${x1}" y1="${f(y(z))}" y2="${f(y(z))}" class="cs-grid"/>`;
+  // Lever et coucher : traits fins au-dessus des nuages.
+  days.forEach((i) => {
+    for (const t of [r.sunrise[i], r.sunset[i]]) g += `<line x1="${f(xt(t))}" x2="${f(xt(t))}" y1="${top}" y2="${bottom}" class="cs-sunline"/>`;
+  });
+  g += '</g>';
+
+  // Altitudes.
   for (const z of Z_TICKS.slice(1)) {
-    g += `<line x1="${x0}" x2="${x1}" y1="${y(z).toFixed(1)}" y2="${y(z).toFixed(1)}" class="cs-grid"/>
-      <text x="${x0 - 5}" y="${(y(z) + 3.5).toFixed(1)}" class="cs-lbl end">${z < 1000 ? z : `${num(z / 1000)} k`}</text>`;
+    g += `<text x="${x0 - 5}" y="${f(y(z) + 3.5)}" class="cs-lbl end">${num(z / 1000)}</text>`;
   }
-  g += `<text x="${x0 - 5}" y="${top - 10}" class="cs-lbl end">m</text>`;
-  g += `<rect x="${x0}" y="${gy.toFixed(1)}" width="${x1 - x0}" height="${(bottom - gy).toFixed(1)}" class="cs-ground"/>`;
+  g += `<text x="${x0 - 5}" y="${top - 4}" class="cs-lbl end unit">km</text>`;
+
+  // Noms des jours et bande jour/nuit.
+  days.forEach((i, k) => {
+    const a = dayX(k) + (k ? 1 : 0), b = dayX(k + 1) - (k < days.length - 1 ? 1 : 0);
+    g += `<text x="${f((dayX(k) + dayX(k + 1)) / 2)}" y="${nameY}" class="cs-dayname${k === 0 ? ' on' : ''}">${dayHead(i)}</text>`;
+    g += `<rect x="${f(a)}" y="${barY}" width="${f(b - a)}" height="${barH}" rx="${barH / 2}" class="cs-bar-night"/>`;
+    const sx = xt(r.sunrise[i]), ex = xt(r.sunset[i]);
+    g += `<rect x="${f(sx)}" y="${barY}" width="${f(ex - sx)}" height="${barH}" rx="${barH / 2}" fill="url(#cs-dawn)"/>`;
+  });
+
+  // Séparateurs de jours (minuit), du nom du jour jusqu'aux heures.
+  for (let k = 1; k < days.length; k++) {
+    g += `<line x1="${f(dayX(k))}" x2="${f(dayX(k))}" y1="${barY - 2}" y2="${rainB}" class="cs-midnight"/>`;
+  }
+
+  // Maintenant.
   if (d === 0) {
     const nx = xt(Date.now());
-    if (nx > x0 && nx < x1) g += `<line x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${top}" y2="${bottom}" class="cs-now"/>`;
+    if (nx > x0 && nx < x1) {
+      g += `<line x1="${f(nx)}" x2="${f(nx)}" y1="${top}" y2="${rainB}" class="cs-now"/>
+        <circle cx="${f(nx)}" cy="${top}" r="3" class="cs-now-dot"/>`;
+    }
   }
+
   // Altitude du sommet.
   const sy = y(s.alt);
-  g += `<line x1="${x0}" x2="${x1}" y1="${sy.toFixed(1)}" y2="${sy.toFixed(1)}" class="cs-summit"/>
-    <text x="${x1 - 4}" y="${(sy - 4).toFixed(1)}" class="cs-summit-lbl">${s.name} ${s.alt} m</text>`;
+  g += `<line x1="${x0}" x2="${x1}" y1="${f(sy)}" y2="${f(sy)}" class="cs-summit"/>
+    <text x="${x1 - 4}" y="${f(sy - 4)}" class="cs-summit-lbl">${s.name} ${s.alt} m</text>`;
+
   // Pluie au lieu.
   const pMax = Math.max(2, ...rain.map((h) => h.precip ?? 0));
-  const rb = 210;
-  g += `<text x="${x0 - 5}" y="${rb - 3}" class="cs-lbl end">mm</text>`;
+  g += `<text x="${x0 - 5}" y="${rainB - 2}" class="cs-lbl end unit">mm</text>`;
   rain.forEach((h, i) => {
     if (!h.precip) return;
-    const bh = Math.max(1.5, (h.precip / pMax) * 18);
-    g += `<rect x="${(x0 + i * cw + 0.3).toFixed(2)}" y="${(rb - bh).toFixed(1)}" width="${Math.max(1, cw - 0.6).toFixed(2)}" height="${bh.toFixed(1)}" class="cs-rain"/>`;
+    const bh = Math.max(1.5, (h.precip / pMax) * (rainB - rainTop));
+    g += `<rect x="${(x0 + i * cw + 0.3).toFixed(2)}" y="${f(rainB - bh)}" width="${Math.max(1, cw - 0.6).toFixed(2)}" height="${f(bh)}" rx="0.8" class="cs-rain"/>`;
   });
-  g += `<line x1="${x0}" x2="${x1}" y1="${rb}" y2="${rb}" class="cs-grid"/>`;
-  dates.forEach((_, k) => {
-    for (const hh of [6, 12, 18]) g += `<text x="${(x0 + (k * 24 + hh) * cw).toFixed(1)}" y="${H - 6}" class="cs-lbl">${hh}</text>`;
+  g += `<line x1="${x0}" x2="${x1}" y1="${rainB}" y2="${rainB}" class="cs-axis"/>`;
+
+  // Heures.
+  days.forEach((_, k) => {
+    for (const hh of [6, 12, 18]) {
+      const hx = x0 + (k * 24 + hh) * cw;
+      g += `<line x1="${f(hx)}" x2="${f(hx)}" y1="${rainB}" y2="${rainB + 3}" class="cs-axis"/>
+        <text x="${f(hx)}" y="${H - 4}" class="cs-lbl">${hh}h</text>`;
+    }
   });
   g += '</svg>';
 
+  const bins = CLOUD_BINS.slice().reverse();
   return `<div class="card clouds">
     ${cardHead('layers', 'Nuages par altitude')}
-    <p class="cs-sub">Au-dessus de ${valleyTown(valleyKey)} (vallée à ${Math.round(ground)} m), sur 3 jours</p>
+    <p class="cs-sub">Au-dessus de ${valleyTown(valleyKey)}, vallée à ${Math.round(ground)} m</p>
     ${g}
+    <div class="cs-scale">
+      <span class="cs-scale-title">Couverture</span>
+      <div class="cs-scale-body">
+        <div class="cs-scale-bar">${bins.map(([min]) => `<i style="background:${cloudColor(min)}"></i>`).join('')}</div>
+        <div class="cs-scale-ticks">${bins.map(([min]) => `<span>${min}</span>`).join('')}<span>100 %</span></div>
+      </div>
+    </div>
     <div class="cs-legend">
-      ${CLOUD_BINS.slice().reverse().map(([min], k, a) => `<span><i style="background:${cloudColor(min)}"></i>${min}${k < a.length - 1 ? `–${a[k + 1][0]}` : '–100'} %</span>`).join('')}
+      <span><i class="k-day"></i>Jour</span>
+      <span><i class="k-night"></i>Nuit</span>
       <span><i class="k-summit"></i>Sommet</span>
-      <span><i class="k-rain"></i>Pluie (max ${num(pMax)} mm/h)</span>
+      <span><i class="k-rain"></i>Pluie, max ${num(pMax)} mm/h</span>
     </div>
   </div>`;
 }
