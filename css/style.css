@@ -27,10 +27,11 @@
   --fab-edge: rgba(255, 255, 255, .12);
   --fab-shadow: rgba(0, 0, 0, .35);
   /* Graphique des nuages */
-  --cs-night: #0b0f1d;
-  --cs-day: #1b2444;
-  --cs-ground: #2a2f45;
-  --cs-grid: rgba(255, 255, 255, .07);
+  --cs-night: #0e1a38;
+  --cs-day: #1d3a72;
+  --cs-ground: #2b2c38;
+  --cs-grid: rgba(255, 255, 255, .1);
+  --cs-grid-strong: rgba(255, 255, 255, .28);
   --cs-axis: rgba(255, 255, 255, .2);
   --cs-midnight: rgba(255, 255, 255, .5);
   --cs-bar-night: #232b47;
@@ -118,10 +119,11 @@
   --mid: #c67a00;
   --bad: #d70015;
 
-  --cs-night: #e9ecf3;
-  --cs-day: #fbfbfd;
-  --cs-ground: #c9ccd6;
-  --cs-grid: rgba(0, 0, 0, .07);
+  --cs-night: #8faad8;
+  --cs-day: #b8dbff;
+  --cs-ground: #c8c2b6;
+  --cs-grid: rgba(255, 255, 255, .45);
+  --cs-grid-strong: rgba(255, 255, 255, .85);
   --cs-axis: rgba(0, 0, 0, .22);
   --cs-midnight: rgba(0, 0, 0, .45);
   --cs-bar-night: #c4cadb;
@@ -629,7 +631,7 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 .cs-day { fill: var(--cs-day); }
 .cs-ground { fill: var(--cs-ground); }
 .cs-grid { stroke: var(--cs-grid); stroke-width: 1; }
-.cs-grid.strong { stroke: var(--cs-axis); stroke-dasharray: 2 3; }
+.cs-grid.strong { stroke: var(--cs-grid-strong); stroke-dasharray: 2 3; }
 .cs-axis { stroke: var(--cs-axis); stroke-width: 1; }
 .cs-sunline { stroke: rgba(var(--cs-sun), .5); stroke-width: 1; stroke-dasharray: 2 3; }
 .cs-sunline.strong { stroke: rgba(var(--cs-sun), .9); stroke-width: 1.5; stroke-dasharray: 4 3; }
@@ -651,6 +653,8 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 .cs-legend { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin-top: var(--sp-3); font-size: 12.5px; color: var(--text-2); }
 .cs-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .cs-legend i { display: inline-block; width: 14px; height: 8px; border-radius: 4px; }
+/* Pastilles des nuages posées sur un liseré « ciel », comme dans le graphique. */
+.cs-legend .k-cloud { width: 16px; height: 12px; border-radius: 4px; box-shadow: 0 0 0 2px var(--cs-day); }
 .k-day { background: linear-gradient(90deg, #ff9f6a, #ffd36b 40%, #ffd36b 60%, #ff9f6a); }
 .k-night { background: var(--cs-bar-night); border: 1px solid var(--edge); }
 .k-summit { height: 0 !important; border-top: 2px dashed var(--c-top); border-radius: 0 !important; }

@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage,
-} from './config.js?v=35';
+} from './config.js?v=38';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=35';
-import { icon } from './icons.js?v=35';
-import { scene } from './scene.js?v=35';
+} from './forecast.js?v=38';
+import { icon } from './icons.js?v=38';
+import { scene } from './scene.js?v=38';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -582,11 +582,11 @@ function ccAt(levels, z) {
 }
 
 // Trois niveaux de couverture, nommés : plus lisibles que des tranches de pourcentage.
-// Sur fond sombre, plus c'est couvert plus c'est clair ; sur fond clair, l'inverse.
+// Sur le ciel bleu du graphique : quelques nuages blancs, nuageux gris clair, couvert gris foncé.
 const CLOUD_LEVELS = [[80, 'Couvert'], [50, 'Nuageux'], [20, 'Quelques nuages']];
 const CLOUD_PALETTES = {
-  dark: [[80, 'rgb(240,243,252)'], [50, 'rgb(158,168,200)'], [20, 'rgb(92,104,142)']],
-  light: [[80, 'rgb(56,64,94)'], [50, 'rgb(128,138,170)'], [20, 'rgb(196,203,222)']],
+  dark: [[80, 'rgb(236,240,248)'], [50, 'rgb(160,174,202)'], [20, 'rgb(98,120,162)']],
+  light: [[80, 'rgb(104,114,138)'], [50, 'rgb(190,198,214)'], [20, 'rgb(255,255,255)']],
 };
 const cloudBins = () => CLOUD_PALETTES[document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'];
 const cloudColor = (cc) => cloudBins().find(([min]) => cc >= min)?.[1] ?? null;
@@ -595,31 +595,81 @@ const cloudWord = (cc) => CLOUD_LEVELS.find(([min]) => cc >= min)?.[1] ?? null; 
 // Altitudes : les basses couches (là où se forment les mers de nuages) occupent l'essentiel de la hauteur.
 const Z_TICKS = [0, 500, 1000, 1500, 2000, 3000, 6000, 12000];
 
-// Image de la coupe : chaque pixel interpole la couverture entre deux heures et deux niveaux,
-// puis prend la couleur de son niveau. Les colonnes couvrent [tStart, tEnd] (ms).
+// Bruit de valeur lissé (déterministe) : donne aux bords des nuages un relief cotonneux.
+function valueNoise(x, y) {
+  const h = (i, j) => { const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return n - Math.floor(n); };
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const sx = xf * xf * (3 - 2 * xf), sy = yf * yf * (3 - 2 * yf);
+  const a = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * sx;
+  const b = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * sx;
+  return a + (b - a) * sy;
+}
+
+// Flou par boîtes répétées (proche d'un flou gaussien) sur un champ W × H.
+function blurField(f, W, H, r, passes = 3) {
+  const tmp = new Float32Array(f.length);
+  for (let p = 0; p < passes; p++) {
+    for (let y = 0; y < H; y++) {
+      let acc = 0;
+      const row = y * W;
+      for (let x = -r; x <= r; x++) acc += f[row + Math.min(W - 1, Math.max(0, x))];
+      for (let x = 0; x < W; x++) {
+        tmp[row + x] = acc / (2 * r + 1);
+        acc += f[row + Math.min(W - 1, x + r + 1)] - f[row + Math.max(0, x - r)];
+      }
+    }
+    for (let x = 0; x < W; x++) {
+      let acc = 0;
+      for (let y = -r; y <= r; y++) acc += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
+      for (let y = 0; y < H; y++) {
+        f[y * W + x] = acc / (2 * r + 1);
+        acc += tmp[Math.min(H - 1, y + r + 1) * W + x] - tmp[Math.max(0, y - r) * W + x];
+      }
+    }
+  }
+}
+
+// Image de la coupe : couverture interpolée en temps et en altitude, lissée, puis colorée par niveau
+// avec des bords fondus (les nuages fins laissent voir le ciel). Les colonnes couvrent [tStart, tEnd] (ms).
 function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
   const k = Math.min(3, Math.max(2, devicePixelRatio || 2));
   const W = Math.round(w * k), H = Math.round(h * k);
   const n = hours.length;
   const h0 = new Date(hours[0].time).getTime();
   const rows = Array.from({ length: H }, (_, py) => zAtRow((py + 0.5) / k));
-  const grid = hours.map((hr) => rows.map((z) => (z < ground ? -1 : ccAt(hr.levels, z) ?? 0)));
-  const rgb = cloudBins().map(([min, c]) => [min, c.match(/\d+/g).map(Number)]);
-  const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
-  const ctx = cv.getContext('2d');
-  const img = ctx.createImageData(W, H);
+  const grid = hours.map((hr) => rows.map((z) => (z < ground ? 0 : ccAt(hr.levels, z) ?? 0)));
+  const field = new Float32Array(W * H);
   for (let px = 0; px < W; px++) {
     const time = tStart + ((px + 0.5) / W) * (tEnd - tStart);
     const t = Math.max(0, Math.min(n - 1, (time - h0) / 3600e3 - 0.5));
     const i0 = Math.floor(t), i1 = Math.min(n - 1, i0 + 1), f = t - i0;
-    for (let py = 0; py < H; py++) {
-      const a = grid[i0][py], b = grid[i1][py];
-      if (a < 0 || b < 0) continue;
-      const bin = rgb.find(([min]) => a + (b - a) * f >= min);
-      if (!bin) continue;
+    for (let py = 0; py < H; py++) field[py * W + px] = grid[i0][py] + (grid[i1][py] - grid[i0][py]) * f;
+  }
+  blurField(field, W, H, Math.round(3 * k));
+
+  const pal = cloudBins().map(([, c]) => c.match(/\d+/g).map(Number)); // couvert, nuageux, quelques
+  const [over, cloudy, few] = pal;
+  const smooth = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+  const mix = (c1, c2, u) => [0, 1, 2].map((i) => c1[i] + (c2[i] - c1[i]) * u);
+
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  const gy = rows.findIndex((z) => z < ground);
+  for (let py = 0; py < H; py++) {
+    if (gy >= 0 && py >= gy) break;
+    for (let px = 0; px < W; px++) {
+      // Relief : ±7 % de couverture selon un bruit à deux échelles.
+      const v = field[py * W + px]
+        + 9 * (valueNoise(px / (9 * k), py / (5 * k)) - 0.5)
+        + 5 * (valueNoise(px / (3.5 * k) + 50, py / (2.5 * k)) - 0.5);
+      const alpha = smooth(14, 26, v);
+      if (alpha <= 0) continue;
+      let c = mix(few, cloudy, smooth(45, 55, v));
+      c = mix(c, over, smooth(75, 85, v));
       const o = (py * W + px) * 4;
-      img.data[o] = bin[1][0]; img.data[o + 1] = bin[1][1]; img.data[o + 2] = bin[1][2]; img.data[o + 3] = 255;
+      img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = Math.round(alpha * 255);
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -633,8 +683,12 @@ const dayHead = (d) => (d === 0 ? 'Aujourd’hui' : d === 1 ? 'Demain'
 const CLOUD_VIEWS = { day: 'Journée', rise: 'Lever', set: 'Coucher' };
 // Vallée du graphique : celle choisie pour ce lieu (liste `chart` de la config), sinon la vallée du meilleur moment.
 function cloudValley(s, d) {
-  if (s.chart?.length) return s.chart.includes(state.chartValley[s.id]) ? state.chartValley[s.id] : s.chart[0];
-  return dayBest(s.id, d)?.ref?.valley ?? s.valleys[0];
+  const want = s.chart?.length
+    ? (s.chart.includes(state.chartValley[s.id]) ? state.chartValley[s.id] : s.chart[0])
+    : dayBest(s.id, d)?.ref?.valley ?? s.valleys[0];
+  // Vallée pas encore dans les prévisions en cache (ajoutée récemment) : une autre vallée du lieu en attendant.
+  if (state.data?.raw?.[want]) return want;
+  return [...(s.chart ?? []), ...s.valleys].find((k) => state.data?.raw?.[k]) ?? want;
 }
 
 function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
@@ -778,7 +832,7 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
     <p class="cs-sub">${sub}</p>
     ${g}
     <div class="cs-legend">
-      ${cloudBins().slice().reverse().map(([min, col]) => `<span><i style="background:${col}"></i>${cloudWord(min)}</span>`).join('')}
+      ${cloudBins().slice().reverse().map(([min, col]) => `<span><i class="k-cloud" style="background:${col}"></i>${cloudWord(min)}</span>`).join('')}
       <span><i class="k-summit"></i>Sommet ${s.alt} m</span>
       <span><i class="k-rain"></i>Pluie</span>
     </div>
