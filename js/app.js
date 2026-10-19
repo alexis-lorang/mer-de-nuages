@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=17';
-import { icon } from './icons.js?v=17';
-import { scene } from './scene.js?v=17';
+} from './forecast.js?v=18';
+import { icon } from './icons.js?v=18';
+import { scene } from './scene.js?v=18';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -377,8 +377,8 @@ function sceneCard(s, d, kind) {
   return `<div class="card scene-card">
     ${scene(s, m?.ref ?? null, m ? c.key : 'low')}
     <div class="scene-switch" role="tablist" aria-label="Moment illustré">
-      ${['rise', 'set'].map((k) => `<button role="tab" data-scene="${k}" aria-selected="${k === kind}">
-        ${icon(KINDS[k].icon)}${k === 'rise' ? 'Au lever' : 'Au coucher'}</button>`).join('')}
+      ${['rise', 'set'].map((k) => `<button role="tab" data-scene="${k}" aria-selected="${k === kind}"
+        aria-label="${k === 'rise' ? 'Au lever' : 'Au coucher'}" title="${k === 'rise' ? 'Au lever' : 'Au coucher'}">${icon(KINDS[k].icon)}</button>`).join('')}
     </div>
   </div>`;
 }

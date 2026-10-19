@@ -411,12 +411,12 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
 .scene-switch button {
-  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 var(--sp-2); border-radius: 10px;
-  font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, .72);
+  display: grid; place-items: center; width: 40px; height: 32px; border-radius: 10px;
+  color: rgba(255, 255, 255, .7);
   transition: background-color .25s var(--ease-ios), color .2s;
 }
 .scene-switch button[aria-selected="true"] { background: rgba(255, 255, 255, .22); color: #fff; }
-.scene-switch .ic { width: 14px; height: 14px; }
+.scene-switch .ic { width: 18px; height: 18px; }
 
 /* Illustration */
 .sc-star { fill: #fff; animation: twinkle 3s ease-in-out infinite alternate; animation-delay: var(--d); }
