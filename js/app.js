@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=18';
-import { icon } from './icons.js?v=18';
-import { scene } from './scene.js?v=18';
+} from './forecast.js?v=19';
+import { icon } from './icons.js?v=19';
+import { scene } from './scene.js?v=19';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
