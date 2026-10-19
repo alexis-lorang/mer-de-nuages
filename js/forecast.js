@@ -76,23 +76,30 @@ async function fetchModel(locs, model, attempt = 1) {
     forecast_days: '7',
     timezone: 'Europe/Paris',
   });
+  // Délai maximal : en cas de surcharge, Open-Meteo peut laisser une requête en suspens plusieurs minutes.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = JSON.parse(await res.text());
     if (json.error) throw new Error(json.reason);
     return Array.isArray(json) ? json : [json];
   } catch (e) {
+    if (e.name === 'AbortError') e = new Error('délai dépassé');
     // Nouvel essai après une pause croissante (le service est parfois surchargé quelques secondes).
     if (attempt < 4) {
       await new Promise((r) => setTimeout(r, 1500 * 2 ** (attempt - 1)));
       return fetchModel(locs, model, attempt + 1);
     }
     throw new Error(`Open-Meteo (${model}) : ${e.message}`);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-function staleCache() {
+// Dernières prévisions connues, quel que soit leur âge (affichées en attendant les nouvelles).
+export function staleCache() {
   for (const key of [CACHE_KEY, 'mdn-forecast-v5', 'mdn-forecast-v4']) {
     try {
       const c = JSON.parse(localStorage.getItem(key));

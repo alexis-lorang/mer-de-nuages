@@ -4,10 +4,10 @@ import {
 } from './config.js';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
-  siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=30';
-import { icon } from './icons.js?v=30';
-import { scene } from './scene.js?v=30';
+  siteWeather, cloudSection, staleCache, MORNING, EVENING,
+} from './forecast.js?v=32';
+import { icon } from './icons.js?v=32';
+import { scene } from './scene.js?v=32';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -387,7 +387,6 @@ function renderDay(enter = false) {
       <a class="pill-btn tap" href="${meteobluePage(s)}" target="_blank" rel="noopener">Prévisions meteoblue ${icon('external')}</a>
     </div>`;
 
-  initCloudReadout();
   if (!enter) {
     replay([...$('#d-day').children], 'swap');
     countUp($('#d-day'));
@@ -590,7 +589,7 @@ const CLOUD_PALETTES = {
 };
 const cloudBins = () => CLOUD_PALETTES[document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'];
 const cloudColor = (cc) => cloudBins().find(([min]) => cc >= min)?.[1] ?? null;
-const cloudWord = (cc) => CLOUD_LEVELS.find(([min]) => cc >= min)?.[1] ?? null;
+const cloudWord = (cc) => CLOUD_LEVELS.find(([min]) => cc >= min)?.[1] ?? null; // libellés de la légende
 
 // Altitudes : les basses couches (là où se forment les mers de nuages) occupent l'essentiel de la hauteur.
 const Z_TICKS = [0, 500, 1000, 1500, 2000, 3000, 6000, 12000];
@@ -626,35 +625,12 @@ function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
   return cv.toDataURL();
 }
 
-// Couches nuageuses d'une heure, en clair : « Couvert de 350 à 750 m, sous le sommet ».
-function describeLayers(levels, ground, alt) {
-  const step = 50;
-  const runs = [];
-  let cur = null;
-  for (let z = Math.ceil(ground / step) * step; z <= 12000; z += step) {
-    const cc = ccAt(levels, z) ?? 0;
-    if (cc >= 20) {
-      if (!cur) cur = { lo: z, hi: z, max: cc };
-      cur.hi = z; cur.max = Math.max(cur.max, cc);
-    } else if (cur) { runs.push(cur); cur = null; }
-  }
-  if (cur) runs.push(cur);
-  const fmtZ = (z) => (z >= 2000 ? `${num(Math.round(z / 100) / 10)} km` : `${Math.round(z / 50) * 50} m`);
-  const parts = runs.filter((r) => r.hi - r.lo >= 100).map((r) => {
-    const where = r.hi < alt - 20 ? ', sous le sommet' : r.lo <= alt + 20 ? ', le sommet est dedans' : '';
-    const lo = r.lo <= ground + step ? 'du sol' : `de ${fmtZ(r.lo)}`;
-    return `<span>${cloudWord(r.max)} ${lo} à ${fmtZ(r.hi)}${where}</span>`;
-  });
-  return parts.length ? parts.join('') : '<span>Ciel dégagé à toutes les altitudes</span>';
-}
-
 const dayHead = (d) => (d === 0 ? 'Aujourd’hui' : d === 1 ? 'Demain'
   : `${cap(fmtWeekday.format(new Date(state.result.sunrise[d])))} ${new Date(state.result.sunrise[d]).getDate()}`);
 
 // Vues du graphique : la journée choisie, ou zoom sur le lever / le coucher.
 const CLOUD_VIEWS = { day: 'Journée', rise: 'Lever', set: 'Coucher' };
 const cloudValley = (s, d) => dayBest(s.id, d)?.ref?.valley ?? s.valleys[0];
-let cloudCtx = null;
 
 function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
   const r = state.result;
@@ -781,15 +757,7 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
       <text x="${f(x)}" y="${H - 3}" class="cs-lbl">${hh} h</text>`;
   }
 
-  // Curseur de lecture (déplacé au doigt).
-  g += `<line class="cs-cursor" x1="0" x2="0" y1="${top}" y2="${rainB}"/>
-    <circle class="cs-cursor-dot" cx="0" cy="${top}" r="4"/>`;
   g += '</svg>';
-
-  // Heure lue par défaut : le moment du zoom, sinon l'heure idéale du meilleur moment du jour.
-  const best = dayBest(s.id, d);
-  const t0 = view === 'rise' ? sr : view === 'set' ? ss : best ? new Date(best.time).getTime() : sr;
-  cloudCtx = { hours, ground, alt: s.alt, tStart, tEnd, x0, x1, W, t0 };
 
   const sub = `${view === 'day' ? dayLabel(d) : `${dayLabel(d)}, autour du ${view === 'rise' ? 'lever' : 'coucher'}`} · au-dessus de ${valleyTown(valleyKey)} (${Math.round(ground)} m)`;
   return `<div class="card clouds">
@@ -799,49 +767,12 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
     </div>
     <p class="cs-sub">${sub}</p>
     ${g}
-    <div class="cs-readout" aria-live="polite"></div>
     <div class="cs-legend">
       ${cloudBins().slice().reverse().map(([min, col]) => `<span><i style="background:${col}"></i>${cloudWord(min)}</span>`).join('')}
       <span><i class="k-summit"></i>Sommet ${s.alt} m</span>
       <span><i class="k-rain"></i>Pluie</span>
     </div>
-    <p class="cs-hint">Glisse le doigt sur le graphique pour lire chaque heure.</p>
   </div>`;
-}
-
-// Lecture au doigt : curseur vertical et description des couches à l'heure touchée.
-function readCloudHour(svg, t) {
-  const c = cloudCtx;
-  if (!c || !svg) return;
-  const card = svg.closest('.card.clouds');
-  const t1 = Math.max(c.tStart, Math.min(c.tEnd - 1, t));
-  const h = c.hours.reduce((a, x) => (Math.abs(new Date(x.time).getTime() + 1800e3 - t1) < Math.abs(new Date(a.time).getTime() + 1800e3 - t1) ? x : a));
-  const ht = new Date(h.time).getTime() + 1800e3;
-  const x = c.x0 + ((ht - c.tStart) / (c.tEnd - c.tStart)) * (c.x1 - c.x0);
-  const line = $('.cs-cursor', svg), dot = $('.cs-cursor-dot', svg);
-  line.setAttribute('x1', x.toFixed(1)); line.setAttribute('x2', x.toFixed(1));
-  dot.setAttribute('cx', x.toFixed(1));
-  svg.classList.add('reading');
-  $('.cs-readout', card).innerHTML = `<b>${new Date(h.time).getHours()} h</b><div>${describeLayers(h.levels, c.ground, c.alt)}</div>`;
-}
-document.addEventListener('pointerdown', (e) => {
-  const svg = e.target.closest?.('svg.cs');
-  if (!svg) return;
-  const move = (ev) => {
-    const rect = svg.getBoundingClientRect();
-    const vx = ((ev.clientX - rect.left) / rect.width) * cloudCtx.W;
-    readCloudHour(svg, cloudCtx.tStart + ((vx - cloudCtx.x0) / (cloudCtx.x1 - cloudCtx.x0)) * (cloudCtx.tEnd - cloudCtx.tStart));
-  };
-  move(e);
-  svg.addEventListener('pointermove', move);
-  const stop = () => { svg.removeEventListener('pointermove', move); };
-  svg.addEventListener('pointerup', stop, { once: true });
-  svg.addEventListener('pointercancel', stop, { once: true });
-});
-// Après chaque affichage du graphique, lecture de l'heure par défaut.
-function initCloudReadout() {
-  const svg = $('#detail svg.cs');
-  if (svg && cloudCtx) readCloudHour(svg, cloudCtx.t0);
 }
 
 function setCloudView(view) {
@@ -859,7 +790,6 @@ function refreshCloudCard() {
   const next = tmp.firstElementChild;
   card.replaceWith(next);
   replay([$('svg.cs', next)], 'swap');
-  initCloudReadout();
 }
 
 function nearCams(s) {
@@ -1220,16 +1150,28 @@ async function load(force = false) {
   state.loading = true;
   state.error = null;
   document.body.classList.add('loading');
+  // Pas encore de prévisions à l'écran : on affiche tout de suite les dernières connues, puis on actualise.
+  if (!state.result) {
+    const old = staleCache();
+    if (old) {
+      state.data = old;
+      compute();
+      renderHome(true);
+      if (onDetail) renderDetail(true);
+    }
+  }
   setStatus(state.result ? 'Actualisation…' : 'Chargement des prévisions…', true);
   const ptr = $('#home .ptr');
   ptr.style.opacity = 0;
   ptr.classList.remove('armed');
   if (!state.result) { renderHome(); if (onDetail) renderDetail(); }
   try {
+    const shownAt = state.result ? state.data?.at : null;
     state.data = await fetchForecast({ force });
+    setStatus(`Vosges du Nord · prévisions de ${hour(state.data.at)}${state.data.stale ? ' (service indisponible, anciennes données)' : ''}`);
+    if (state.data.at === shownAt) return; // ces prévisions sont déjà à l'écran
     const first = !state.result;
     compute();
-    setStatus(`Vosges du Nord · prévisions de ${hour(state.data.at)}${state.data.stale ? ' (service indisponible, anciennes données)' : ''}`);
     renderHome(first || force);
     if (onDetail) renderDetail(first || force);
   } catch (e) {

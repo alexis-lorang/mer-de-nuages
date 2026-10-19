@@ -27,7 +27,7 @@ pour l’ouvrir en plein écran comme une app.
 - **Page d’un lieu**, de haut en bas : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne,
   mer de nuages), au lever ou au coucher ; nuages par altitude au-dessus de la vallée de référence, sur la
   journée choisie ou en zoom sur le lever / le coucher (3 niveaux : quelques nuages, nuageux, couvert ; altitudes
-  détaillées sous 3 km, jusqu’à 12 km) ; au doigt, une phrase décrit les couches à l’heure touchée ;
+  détaillées sous 3 km, jusqu’à 12 km) ;
   webcams proches ; météo du jour au sommet avec l’heure par heure (lever et coucher intercalés) ; tableau
   lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus, inversion,
   vent, accord des modèles) ; le lieu et le lien vers meteoblue.
