@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=21';
-import { icon } from './icons.js?v=21';
-import { scene } from './scene.js?v=21';
+} from './forecast.js?v=23';
+import { icon } from './icons.js?v=23';
+import { scene } from './scene.js?v=23';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -182,8 +182,9 @@ const cardHead = (ic, title, extra = '') => `<div class="card-head">${icon(ic)}<
 function camTile(c, extra = '') {
   return `<button class="cam tap" data-cam="${c.id}" aria-label="Webcam ${c.name}, timelapse">
     <span class="cam-img"><img loading="lazy" decoding="async" src="${webcamImage(c.id, state.daylight ? 'daylight' : 'current')}" alt=""
-      onerror="this.parentNode.classList.add('broken')">${icon('camera', 'cam-ph')}</span>
-    <span class="cam-cap"><b>${c.name}</b>${extra ? `<small>${extra}</small>` : ''}</span>
+      onerror="this.parentNode.classList.add('broken')">${icon('camera', 'cam-ph')}
+      <span class="cam-cap"><b>${c.name}</b>${extra ? `<small>${extra}</small>` : ''}</span>
+      <span class="cam-play">${icon('play')}</span></span>
   </button>`;
 }
 
@@ -210,22 +211,26 @@ function renderHome(enter = false) {
   const hero = top && top.b.score >= 20 ? (() => {
     const c = scoreClass(top.b.score);
     const k = KINDS[top.b.kind];
-    return `<button class="card hero tap" data-site="${top.s.id}" data-day="${top.d}">
-      <div class="hero-scene">${scene(top.s, top.b.ref, c.key, { W: 360, H: 140, labels: false })}</div>
+    return `<button class="card hero tap ${c.key}" data-site="${top.s.id}" data-day="${top.d}">
+      <div class="hero-scene">${scene(top.s, top.b.ref, c.key, { W: 360, H: 150, labels: false })}</div>
       <div class="hero-info">
-        <p class="eyebrow">Meilleure chance</p>
         <div class="hero-row">
           <div class="hero-text">
+            <p class="eyebrow">${icon('star')}Meilleure chance</p>
             <h2 class="hero-site">${top.s.name}</h2>
             <p class="hero-meta">${icon(k.icon)}${dayLabel(top.d)} · ${k.label.toLowerCase()} ${hour(k.at(r, top.d))}</p>
-            <p class="hero-verdict ${c.key}">${c.label}</p>
           </div>
-          ${ring(top.b.score, c.key, 64)}
+          ${ring(top.b.score, c.key, 72)}
         </div>
+      </div>
+      <div class="hero-foot">
+        <span class="chip ${c.key}">${c.label}</span>
+        <span class="hero-note">${cap(layerNote(top.s, top.b.ref))}</span>
+        ${icon('chevron', 'hero-chev')}
       </div>
     </button>`;
   })() : `<div class="card hero">
-      <div class="hero-scene">${scene(SITES[0], null, 'low', { W: 360, H: 140, labels: false })}</div>
+      <div class="hero-scene">${scene(SITES[0], null, 'low', { W: 360, H: 150, labels: false })}</div>
       <div class="hero-info">
         <p class="eyebrow">${days.length} prochains jours</p>
         <h2 class="hero-site">Pas de mer de nuages en vue</h2>
@@ -233,31 +238,38 @@ function renderHome(enter = false) {
       </div>
     </div>`;
 
-  // Une carte par lieu : nom, puis meilleure chance de chaque jour avec l'icône du moment (lever ou coucher).
-  const cell = (s, d) => {
+  // Une carte par lieu : nom, puis une case par jour. Chaque case se remplit depuis le bas selon la chance
+  // de mer de nuages (comme une mer qui monte) ; le meilleur jour du lieu est entouré.
+  const cell = (s, d, j, best) => {
     const b = dayScore(s.id, d);
     const c = scoreClass(b?.score);
     const when = b?.kind ? ` au ${KINDS[b.kind].label.toLowerCase()}` : '';
-    return `<button class="pl-day ${c.key}" data-site="${s.id}" data-day="${d}"
-        aria-label="${s.name}, ${dayLabel(d)}${when} : ${b?.score ?? 'pas de données'}, ${c.label}">
+    return `<button class="pl-day ${c.key}${best ? ' best' : ''}" data-site="${s.id}" data-day="${d}"
+        style="--v:${Math.max(0.05, (b?.score ?? 0) / 100).toFixed(2)};--j:${j}"
+        aria-label="${s.name}, ${dayLabel(d)}${when} : ${b?.score ?? 'pas de données'}, ${c.label}${best ? ', meilleur jour' : ''}">
       <span class="pl-d">${dayShort(d)}</span>
       <b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b>
       ${b?.kind ? icon(KINDS[b.kind].icon, 'pl-k') : '<i class="pl-k"></i>'}
     </button>`;
   };
-  const places = SITES.map((s) => `<article class="card place">
+  const places = SITES.map((s) => {
+    const scores = days.map((d) => dayScore(s.id, d)?.score ?? -1);
+    const max = Math.max(...scores);
+    const bestJ = max >= 20 ? scores.indexOf(max) : -1;
+    return `<article class="card place">
       <button class="pl-head" data-site="${s.id}" data-day="${days[0]}">
         <b>${s.name}</b><small>${s.alt} m</small>${icon('chevron', 'pl-chev')}
       </button>
-      <div class="pl-days" style="--n:${days.length}">${days.map((d) => cell(s, d)).join('')}</div>
-    </article>`).join('');
-  const note = 'Meilleure chance de la journée, de 0 à 100 ; l’icône indique si c’est au lever ou au coucher. '
-    + 'Au-delà de 4 jours, seul le modèle ICON est disponible : prévision moins sûre.';
+      <div class="pl-days" style="--n:${days.length}">${days.map((d, j) => cell(s, d, j, j === bestJ)).join('')}</div>
+    </article>`;
+  }).join('');
+  const note = 'Meilleure chance de la journée, de 0 à 100 : la case se remplit d’autant, l’icône indique le lever '
+    + 'ou le coucher, le meilleur jour est entouré. Au-delà de 4 jours, seul le modèle ICON est disponible.';
 
   body.innerHTML = `
     ${hero}
     <section class="section">
-      <div class="section-head"><h2>Lieux</h2></div>
+      <div class="section-head"><h2>Lieux</h2><span class="section-sub">${days.length} prochains jours</span></div>
       <div class="stack">${places}</div>
       <div class="legend">
         ${['top', 'good', 'maybe', 'low'].map((k) => `<span class="${k}"><i></i>${scoreClass({ top: 65, good: 40, maybe: 20, low: 0 }[k]).label}</span>`).join('')}
@@ -319,6 +331,7 @@ function renderDetail(enter = false) {
     const b = dayScore(s.id, d);
     const c = scoreClass(b?.score);
     return `<button class="seg tap ${c.key}" role="tab" data-day="${d}" aria-selected="${d === state.day}"
+        style="--v:${Math.max(0.05, (b?.score ?? 0) / 100).toFixed(2)};--j:${days.indexOf(d)}"
         aria-label="${dayLabel(d)} : ${b?.score ?? 'pas de données'}">
       <span>${dayShort(d)}</span><b>${b?.score ?? '–'}</b></button>`;
   }).join('');
@@ -349,10 +362,10 @@ function renderDay(enter = false) {
     const k = KINDS[kind];
     const mc = scoreClass(m?.score);
     const past = isPast(d, kind);
-    return `<div class="card moment ${mc.key}${past ? ' past' : ''}">
+    return `<div class="card moment ${mc.key}${past ? ' past' : ''}" style="--v:${Math.max(0.04, (m?.score ?? 0) / 100).toFixed(2)}">
       ${cardHead(k.icon, `${k.label} ${hour(k.at(r, d))}`)}
       <b class="m-score" data-count="${m?.score ?? ''}">${m?.score ?? '–'}</b>
-      <p class="m-verdict">${mc.label}</p>
+      <span class="chip ${mc.key}">${mc.label}</span>
       <p class="m-foot">${past ? 'Passé' : m ? `Idéal vers ${hour(m.time)}` : 'Pas de données'}</p>
     </div>`;
   };
