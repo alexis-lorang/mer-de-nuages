@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=25';
-import { icon } from './icons.js?v=25';
-import { scene } from './scene.js?v=25';
+} from './forecast.js?v=26';
+import { icon } from './icons.js?v=26';
+import { scene } from './scene.js?v=26';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -373,13 +373,13 @@ function renderDay(enter = false) {
   $('#d-day').innerHTML = `
     <div class="moments">${momentCard('rise', rise)}${momentCard('set', set)}</div>
     ${best ? sceneCard(s, d, state.sceneKind ?? bestKind) : ''}
-    ${compareCard(s, rise, set)}
     ${cloudCard(s, d)}
-    ${weatherCard(s, d)}
     <section class="section">
       <div class="section-head"><h2>Webcams proches</h2></div>
       <div class="cam-strip">${nearCams(s).map(({ c: cam, dist }) => camTile(cam, `${dist.toFixed(0)} km`)).join('')}</div>
     </section>
+    ${weatherCard(s, d)}
+    ${compareCard(s, rise, set)}
     <div class="card about">
       ${cardHead('pin', 'Le lieu')}
       <p>${s.note}</p>
@@ -490,7 +490,45 @@ function weatherCard(s, d) {
       <div><small>Rafales</small><b>${int(day.gust)}<i> km/h</i></b></div>
       <div><small>Nuages</small><b>${int(cloud)}<i> %</i></b></div>
     </div>
+    ${hourlyStrip(w, d)}
   </div>`;
+}
+
+// Heure par heure : 24 h à partir de minuit (ou de maintenant aujourd'hui), lever et coucher intercalés.
+function hourlyStrip(w, d) {
+  const r = state.result;
+  const date = r.sunrise[d].slice(0, 10);
+  const sr = new Date(r.sunrise[d]).getTime(), ss = new Date(r.sunset[d]).getTime();
+  const nowT = Date.now();
+  let hours = w.hourly.filter((h) => h.time.startsWith(date));
+  if (d === 0) hours = hours.filter((h) => new Date(h.time).getTime() + 3600e3 > nowT);
+  if (!hours.length) return '';
+  const night = (t) => t < sr || t > ss;
+  const items = [];
+  for (const h of hours) {
+    const t = new Date(h.time).getTime();
+    for (const [st, kind] of [[sr, 'rise'], [ss, 'set']]) {
+      if (st >= t && st < t + 3600e3) items.push({ sun: kind, t: st });
+    }
+    items.push({ h, t });
+  }
+  items.sort((a, b) => a.t - b.t || (a.sun ? -1 : 1));
+  const first = items.find((x) => x.h);
+  const cells = items.map((x) => {
+    if (x.sun) {
+      return `<div class="hr sun" role="listitem">
+        <span class="hr-t">${hour(x.t)}</span>${icon(KINDS[x.sun].icon, 'hr-ic')}<b>${x.sun === 'rise' ? 'Lever' : 'Coucher'}</b><small class="hr-p"></small></div>`;
+    }
+    const { h } = x;
+    const isNow = d === 0 && x === first;
+    const wx = wmo(h.code);
+    const ic = night(x.t + 1800e3) ? (wx.icon === 'w-sun' ? 'w-moon' : wx.icon === 'w-partly' ? 'w-moon-cloud' : wx.icon) : wx.icon;
+    return `<div class="hr${isNow ? ' now' : ''}" role="listitem" aria-label="${isNow ? 'Maintenant' : hour(h.time)} : ${wx.label}, ${num(h.t, '°')}${h.precip ? `, ${num(h.precip)} mm` : ''}">
+      <span class="hr-t">${isNow ? 'Maint.' : `${new Date(h.time).getHours()} h`}</span>${icon(ic, 'hr-ic')}<b>${int(h.t, '°')}</b>
+      <small class="hr-p">${h.precip >= 0.1 ? num(h.precip) : ''}</small></div>`;
+  }).join('');
+  return `<div class="hourly" role="list" aria-label="Heure par heure">${cells}</div>
+    <p class="hr-note">${icon('drop')}Pluie en mm par heure</p>`;
 }
 
 // Couverture nuageuse au fil de la journée, par altitude, au-dessus de la vallée de référence.

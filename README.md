@@ -24,11 +24,12 @@ pour l’ouvrir en plein écran comme une app.
 - **Accueil** : la meilleure chance à venir, puis une carte par lieu avec les 5 prochains jours : meilleure chance
   de la journée et icône du moment (lever ou coucher). Toucher un jour ouvre la page du lieu sur ce jour.
   Tirer vers le bas pour actualiser.
-- **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages), au lever ou au coucher ;
-  tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
-  inversion, vent, accord des modèles) ; nuages par altitude sur 3 jours au-dessus de la vallée de référence
-  (même échelle et mêmes classes que meteoblue, de 0 à 14 km), ou zoom dans le temps sur le lever / le coucher (même hauteur,
-  heure par heure), avec l’altitude du sommet, le jour et la nuit, et la pluie ; météo du jour au sommet ; webcams proches ; lien vers meteoblue.
+- **Page d’un lieu**, de haut en bas : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne,
+  mer de nuages), au lever ou au coucher ; nuages par altitude sur 3 jours au-dessus de la vallée de référence
+  (même échelle et mêmes classes que meteoblue, de 0 à 14 km), ou zoom dans le temps sur le lever / le coucher ;
+  webcams proches ; météo du jour au sommet avec l’heure par heure (lever et coucher intercalés) ; tableau
+  lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus, inversion,
+  vent, accord des modèles) ; le lieu et le lien vers meteoblue.
   Retour par le bouton « Lieux » flottant en bas, ou en glissant depuis le bord gauche (app installée).
   Rien d’interactif dans le haut de l’écran : en mode application, iOS floute la zone sous la barre d’état.
 - **Réglages** (bouton à droite du grand titre) : modèle météo, apparence (automatique, clair ou sombre, mémorisée),

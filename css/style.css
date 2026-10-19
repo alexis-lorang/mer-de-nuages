@@ -526,6 +526,27 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 .wx-stats small { display: block; font-size: 12px; color: var(--text-2); }
 .wx-stats b { display: block; margin-top: 2px; font: 500 17px/1.2 var(--font-round); font-variant-numeric: tabular-nums; }
 .wx-stats i { font: 400 12px var(--font); color: var(--text-2); }
+.hourly {
+  display: flex; gap: var(--sp-1); overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  margin: var(--sp-3) calc(-1 * var(--sp-4)) 0; padding: 0 var(--sp-4);
+  scroll-snap-type: x proximity; scroll-padding: 0 var(--sp-4);
+}
+.hourly::-webkit-scrollbar { display: none; }
+.hr {
+  flex: 0 0 52px; scroll-snap-align: start;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0 8px; border-radius: 14px;
+}
+.hr.now { background: var(--fill); }
+.hr.sun { flex-basis: 58px; }
+.hr-t { font-size: 13px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hr.now .hr-t { color: var(--text); }
+.hr-ic { width: 24px; height: 24px; stroke-width: 1.7; }
+.hr.sun .hr-ic { color: var(--accent); }
+.hr b { font: 500 17px/1 var(--font-round); font-variant-numeric: tabular-nums; }
+.hr.sun b { font: 600 12px/17px var(--font); color: var(--accent); }
+.hr-p { min-height: 14px; font-size: 11px; font-weight: 600; color: var(--cs-rain); font-variant-numeric: tabular-nums; }
+.hr-note { display: flex; align-items: center; gap: 5px; margin-top: var(--sp-2); font-size: 12px; color: var(--text-3); }
+.hr-note .ic { width: 12px; height: 12px; color: var(--cs-rain); }
 
 /* Nuages par altitude */
 .cs-sub { margin: var(--sp-2) 0 var(--sp-3); font-size: 13px; color: var(--text-2); }
