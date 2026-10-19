@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=16';
-import { icon } from './icons.js?v=16';
-import { scene } from './scene.js?v=16';
+} from './forecast.js?v=17';
+import { icon } from './icons.js?v=17';
+import { scene } from './scene.js?v=17';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -349,10 +349,7 @@ function renderDay(enter = false) {
 
   $('#d-day').innerHTML = `
     <div class="moments">${momentCard('rise', rise)}${momentCard('set', set)}</div>
-    ${best ? `<div class="card scene-card">
-      ${scene(s, best.ref, c.key)}
-      <span class="scene-cap">${icon(KINDS[bestKind].icon)}${bestKind === 'rise' ? 'Au lever' : 'Au coucher'}</span>
-    </div>` : ''}
+    ${best ? sceneCard(s, d, state.sceneKind ?? bestKind) : ''}
     ${compareCard(s, rise, set)}
     ${cloudCard(s, d)}
     ${weatherCard(s, d)}
@@ -371,6 +368,30 @@ function renderDay(enter = false) {
     replay([...$('#d-day').children], 'swap');
     countUp($('#d-day'));
   }
+}
+
+// Illustration de la mer de nuages par rapport au sommet, au lever ou au coucher.
+function sceneCard(s, d, kind) {
+  const m = moment(s.id, d, kind);
+  const c = scoreClass(m?.score);
+  return `<div class="card scene-card">
+    ${scene(s, m?.ref ?? null, m ? c.key : 'low')}
+    <div class="scene-switch" role="tablist" aria-label="Moment illustré">
+      ${['rise', 'set'].map((k) => `<button role="tab" data-scene="${k}" aria-selected="${k === kind}">
+        ${icon(KINDS[k].icon)}${k === 'rise' ? 'Au lever' : 'Au coucher'}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function setSceneKind(kind) {
+  const card = $('#detail .scene-card');
+  if (!card || card.querySelector(`[data-scene="${kind}"][aria-selected="true"]`)) return;
+  state.sceneKind = kind;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = sceneCard(siteById(state.site), state.day, kind);
+  const next = tmp.firstElementChild;
+  card.replaceWith(next);
+  replay([$('svg.scene', next)], 'swap');
 }
 
 // Conditions au lever et au coucher, côte à côte.
@@ -782,6 +803,7 @@ function route() {
     state.site = r.site;
     state.day = r.day;
     if (changed) {
+      state.sceneKind = null;
       $('.scroller', detail).scrollTop = 0;
       renderDetail(true);
     }
@@ -802,6 +824,7 @@ window.addEventListener('popstate', route);
 function selectDay(d) {
   if (d === state.day) return;
   state.day = d;
+  state.sceneKind = null;
   history.replaceState(history.state, '', `#/lieu/${state.site}/${d}`);
   $$('.segmented .seg').forEach((b) => b.setAttribute('aria-selected', String(Number(b.dataset.day) === d)));
   $('.seg-thumb')?.style.setProperty('--k', detailDays().indexOf(d));
@@ -810,11 +833,12 @@ function selectDay(d) {
 
 // Délégation des clics.
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-theme-pref]');
+  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-theme-pref], [data-scene]');
   if (!t) return;
   if (t.dataset.cam) return openCam(WEBCAMS.find((c) => c.id === Number(t.dataset.cam)));
   if (t.dataset.model) return setModel(t.dataset.model);
   if (t.dataset.themePref) return setThemePref(t.dataset.themePref);
+  if (t.dataset.scene) return setSceneKind(t.dataset.scene);
   if (t.dataset.cloudview) return setCloudView(t.dataset.cloudview);
   if (t.dataset.site) return openSite(t.dataset.site, Number(t.dataset.day));
   if (t.dataset.day && t.closest('.segmented')) return selectDay(Number(t.dataset.day));

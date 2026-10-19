@@ -24,7 +24,7 @@ pour l’ouvrir en plein écran comme une app.
 - **Accueil** : la meilleure chance à venir, puis une carte par lieu avec les 7 prochains jours : meilleure chance
   de la journée et icône du moment (lever ou coucher). Toucher un jour ouvre la page du lieu sur ce jour.
   Tirer vers le bas pour actualiser.
-- **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages) ;
+- **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages), au lever ou au coucher ;
   tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
   inversion, vent, accord des modèles) ; nuages par altitude sur 3 jours au-dessus de la vallée de référence
   (même échelle et mêmes classes que meteoblue, de 0 à 14 km), ou zoom dans le temps sur le lever / le coucher (même hauteur,
