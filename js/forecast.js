@@ -1,5 +1,5 @@
 // Récupération Open-Meteo + calcul de l'indice "mer de nuages".
-import { SITES, VALLEYS, MODELS } from './config.js';
+import { SITES, VALLEYS, MODELS } from './config.js?v=35';
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
@@ -10,7 +10,7 @@ const SURFACE = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visi
 const WEATHER = ['weather_code', 'precipitation', 'cloud_cover', 'wind_gusts_10m', 'wind_direction_10m'];
 const DAILY = ['sunrise', 'sunset', 'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max'];
 const ALL_MODELS = MODELS.consensus.ids;
-const CACHE_KEY = 'mdn-forecast-v6';
+const CACHE_KEY = 'mdn-forecast-v7';
 const CACHE_TTL = 30 * 60 * 1000;
 
 function hourlyVars() {
@@ -61,7 +61,7 @@ export async function fetchForecast({ force = false } = {}) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     // Anciennes versions du cache : inutiles une fois la nouvelle enregistrée (place limitée).
-    for (const k of ['mdn-forecast-v2', 'mdn-forecast-v3', 'mdn-forecast-v4', 'mdn-forecast-v5']) localStorage.removeItem(k);
+    for (const k of ['mdn-forecast-v2', 'mdn-forecast-v3', 'mdn-forecast-v4', 'mdn-forecast-v5', 'mdn-forecast-v6']) localStorage.removeItem(k);
   } catch { /* quota */ }
   return data;
 }
@@ -78,7 +78,7 @@ async function fetchModel(locs, model, attempt = 1) {
   });
   // Délai maximal : en cas de surcharge, Open-Meteo peut laisser une requête en suspens plusieurs minutes.
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -100,7 +100,8 @@ async function fetchModel(locs, model, attempt = 1) {
 
 // Dernières prévisions connues, quel que soit leur âge (affichées en attendant les nouvelles).
 export function staleCache() {
-  for (const key of [CACHE_KEY, 'mdn-forecast-v5', 'mdn-forecast-v4']) {
+  // Un cache plus ancien peut ne pas contenir un lieu ajouté depuis : ce lieu s'affichera sans données.
+  for (const key of [CACHE_KEY, 'mdn-forecast-v6']) {
     try {
       const c = JSON.parse(localStorage.getItem(key));
       if (c?.raw) return c;
@@ -241,7 +242,7 @@ function scoreHour(sp, vp, alt) {
 
 export function computeAll(data, modelKey) {
   const models = MODELS[modelKey].ids;
-  const first = data.raw[SITES[0].id];
+  const first = data.raw[SITES.find((s) => data.raw[s.id])?.id];
   const times = first.hourly.time;
   const sunrise = pick(first.daily, 'sunrise', ALL_MODELS[0]);
   const sunset = pick(first.daily, 'sunset', ALL_MODELS[0]);
@@ -259,7 +260,7 @@ export function computeAll(data, modelKey) {
       for (const m of models) {
         let best = null;
         for (const vk of s.valleys) {
-          const r = scoreHour(profiles[m][s.id][i], profiles[m][vk][i], s.alt);
+          const r = scoreHour(profiles[m][s.id]?.[i], profiles[m][vk]?.[i], s.alt);
           if (r && (!best || r.score > best.score)) best = { ...r, valley: vk };
         }
         if (best) perModel[m] = best;
@@ -306,6 +307,7 @@ export function eveningWindow(result, dayIdx) {
 export function siteWeather(data, siteId, modelKey) {
   const models = modelKey === 'consensus' ? ['meteofrance_seamless', 'icon_seamless'] : MODELS[modelKey].ids;
   const loc = data.raw[siteId];
+  if (!loc) return { hourly: [], daily: [] };
   const get = (part, name, i) => {
     for (const m of models) {
       const v = pick(loc[part], name, m)?.[i];
@@ -367,6 +369,7 @@ export function nowIndex(result) {
 // En consensus : moyenne des modèles niveau par niveau.
 export function cloudSection(data, key, modelKey) {
   const loc = data.raw[key];
+  if (!loc) return [];
   const h = loc.hourly;
   const models = MODELS[modelKey].ids;
   return h.time.map((time, i) => {

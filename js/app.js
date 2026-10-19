@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage,
-} from './config.js';
+} from './config.js?v=35';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=32';
-import { icon } from './icons.js?v=32';
-import { scene } from './scene.js?v=32';
+} from './forecast.js?v=35';
+import { icon } from './icons.js?v=35';
+import { scene } from './scene.js?v=35';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -35,6 +35,7 @@ const state = {
   daylight: store.get('mdn-daylight', '0') === '1',
   cloudView: store.get('mdn-cloud-view', 'day') === 'days' ? 'day' : store.get('mdn-cloud-view', 'day'),
   themePref: store.get('mdn-theme', 'auto'),
+  chartValley: (() => { try { return JSON.parse(store.get('mdn-chart-valley', '{}')) || {}; } catch { return {}; } })(),
   site: null,
   day: null,
 };
@@ -630,13 +631,18 @@ const dayHead = (d) => (d === 0 ? 'Aujourd’hui' : d === 1 ? 'Demain'
 
 // Vues du graphique : la journée choisie, ou zoom sur le lever / le coucher.
 const CLOUD_VIEWS = { day: 'Journée', rise: 'Lever', set: 'Coucher' };
-const cloudValley = (s, d) => dayBest(s.id, d)?.ref?.valley ?? s.valleys[0];
+// Vallée du graphique : celle choisie pour ce lieu (liste `chart` de la config), sinon la vallée du meilleur moment.
+function cloudValley(s, d) {
+  if (s.chart?.length) return s.chart.includes(state.chartValley[s.id]) ? state.chartValley[s.id] : s.chart[0];
+  return dayBest(s.id, d)?.ref?.valley ?? s.valleys[0];
+}
 
 function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
   const r = state.result;
   const view = CLOUD_VIEWS[state.cloudView] ? state.cloudView : 'day';
   state.sections[valleyKey] ??= cloudSection(state.data, valleyKey, state.model);
   const all = state.sections[valleyKey];
+  if (!all.length) return ''; // vallée absente des prévisions en cache
   const H1 = 3600e3;
   const sr = new Date(r.sunrise[d]).getTime(), ss = new Date(r.sunset[d]).getTime();
 
@@ -759,12 +765,16 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
 
   g += '</svg>';
 
-  const sub = `${view === 'day' ? dayLabel(d) : `${dayLabel(d)}, autour du ${view === 'rise' ? 'lever' : 'coucher'}`} · au-dessus de ${valleyTown(valleyKey)} (${Math.round(ground)} m)`;
+  const sub = `${view === 'day' ? dayLabel(d) : `${dayLabel(d)}, autour du ${view === 'rise' ? 'lever' : 'coucher'}`} · au-dessus de ${valleyTown(valleyKey)} (vallée à ${Math.round(ground)} m)`;
   return `<div class="card clouds">
     ${cardHead('layers', 'Nuages par altitude')}
     <div class="mini-seg" role="tablist" aria-label="Période du graphique">
       ${Object.entries(CLOUD_VIEWS).map(([k, label]) => `<button role="tab" data-cloudview="${k}" aria-selected="${k === view}">${label}</button>`).join('')}
     </div>
+    ${s.chart?.length > 1 ? `<div class="valley-pick" role="radiogroup" aria-label="Vallée du graphique">
+      <span>Vallée</span>
+      ${s.chart.map((k) => `<button role="radio" data-chartvalley="${k}" aria-checked="${k === valleyKey}">${valleyTown(k)}</button>`).join('')}
+    </div>` : ''}
     <p class="cs-sub">${sub}</p>
     ${g}
     <div class="cs-legend">
@@ -773,6 +783,14 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
       <span><i class="k-rain"></i>Pluie</span>
     </div>
   </div>`;
+}
+
+function setChartValley(k) {
+  const s = siteById(state.site);
+  if (!s?.chart?.includes(k) || cloudValley(s, state.day) === k) return;
+  state.chartValley[s.id] = k;
+  store.set('mdn-chart-valley', JSON.stringify(state.chartValley));
+  refreshCloudCard();
 }
 
 function setCloudView(view) {
@@ -896,12 +914,13 @@ function selectDay(d) {
 
 // Délégation des clics.
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-theme-pref], [data-scene]');
+  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-theme-pref], [data-scene], [data-chartvalley]');
   if (!t) return;
   if (t.dataset.cam) return openCam(WEBCAMS.find((c) => c.id === Number(t.dataset.cam)));
   if (t.dataset.model) return setModel(t.dataset.model);
   if (t.dataset.themePref) return setThemePref(t.dataset.themePref);
   if (t.dataset.scene) return setSceneKind(t.dataset.scene);
+  if (t.dataset.chartvalley) return setChartValley(t.dataset.chartvalley);
   if (t.dataset.cloudview) return setCloudView(t.dataset.cloudview);
   if (t.dataset.site) return openSite(t.dataset.site, Number(t.dataset.day));
   if (t.dataset.day && t.closest('.segmented')) return selectDay(Number(t.dataset.day));

@@ -1,7 +1,7 @@
 # Mers de nuages · Vosges du Nord
 
 Application web statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 5 jours pour :
-Donon, Rocher de Mutzig, Rocher de Dabo, Col du Valsberg et Château du Haut-Barr.
+Donon, Rocher de Mutzig, Rocher de Dabo, Col du Valsberg, Château du Haut-Barr et Château de Lutzelbourg.
 
 ## Lancer
 
@@ -66,7 +66,9 @@ Les seuils et pondérations sont dans `js/forecast.js` (`scoreHour`). C’est un
 
 ## Fichiers
 
-- `js/config.js` : sites, vallées de référence, webcams, URLs meteoblue/Windy
+- `js/config.js` : sites, vallées de référence (calcul de l’indice), vallée(s) du graphique des nuages (`chart` :
+  une seule = fixe, plusieurs = au choix dans la carte ; Dabo → Sarrebourg, Valsberg → Wasselonne,
+  Donon → Grandfontaine ou Schirmeck, Mutzig → Lutzelhouse ou Schirmeck, Lutzelbourg → Lutzelbourg), webcams
 - `js/forecast.js` : récupération Open-Meteo (cache 30 min) et calcul de l’indice
 - `js/app.js` : interface (accueil, page lieu, navigation, réglages)
 - `js/scene.js` : illustration animée (montagne, mer de nuages, ciel)

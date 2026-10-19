@@ -7,6 +7,7 @@ export const SITES = [
     name: 'Donon',
     lat: 48.5126, lon: 7.1645, alt: 1009,
     valleys: ['sarrebourg', 'bruche', 'molsheim'],
+    chart: ['grandfontaine', 'bruche'],
     note: 'Vue à 360° : plateau lorrain, vallée de la Bruche, plaine d’Alsace au loin.',
   },
   {
@@ -14,6 +15,7 @@ export const SITES = [
     name: 'Rocher de Mutzig',
     lat: 48.5494, lon: 7.2398, alt: 1009,
     valleys: ['molsheim', 'bruche', 'wasselonne'],
+    chart: ['lutzelhouse', 'bruche'],
     note: 'Point culminant des Vosges du Nord, belle vue sur la plaine et la Bruche.',
   },
   {
@@ -21,6 +23,7 @@ export const SITES = [
     name: 'Rocher de Dabo',
     lat: 48.6490, lon: 7.2456, alt: 664, labelLeft: true,
     valleys: ['sarrebourg', 'wasselonne'],
+    chart: ['sarrebourg'],
     note: 'Belvédère sur le plateau lorrain et le massif du Dabo.',
   },
   {
@@ -28,6 +31,7 @@ export const SITES = [
     name: 'Col du Valsberg',
     lat: 48.6511, lon: 7.2943, alt: 650, labelRight: true,
     valleys: ['wasselonne', 'sarrebourg'],
+    chart: ['wasselonne'],
     note: 'Col entre Dabo et Obersteigen, vue sur la Mossig et la plaine.',
   },
   {
@@ -36,6 +40,14 @@ export const SITES = [
     lat: 48.7247, lon: 7.3383, alt: 460,
     valleys: ['saverne', 'kochersberg'],
     note: '« Œil de l’Alsace » : la mer de nuages doit rester sous ~430 m.',
+  },
+  {
+    id: 'chateau-lutzelbourg',
+    name: 'Château de Lutzelbourg',
+    lat: 48.7327, lon: 7.2538, alt: 322,
+    valleys: ['lutzelbourg', 'saverne'],
+    chart: ['lutzelbourg'],
+    note: 'Ruines sur un promontoire au-dessus de la vallée de la Zorn : la mer de nuages doit rester sous ~300 m.',
   },
 ];
 
@@ -47,6 +59,9 @@ export const VALLEYS = {
   wasselonne:  { name: 'Mossig (Wasselonne)', lat: 48.637, lon: 7.448 },
   saverne:     { name: 'Saverne / Zorn', lat: 48.742, lon: 7.365 },
   kochersberg: { name: 'Plaine (Kochersberg)', lat: 48.690, lon: 7.560 },
+  grandfontaine: { name: 'Haute Bruche (Grandfontaine)', lat: 48.4933, lon: 7.1617 },
+  lutzelhouse: { name: 'Vallée de la Bruche (Lutzelhouse)', lat: 48.5196, lon: 7.2880 },
+  lutzelbourg: { name: 'Vallée de la Zorn (Lutzelbourg)', lat: 48.7352, lon: 7.2504 },
 };
 
 // Webcams Windy (images publiques, timelapse intégrable).

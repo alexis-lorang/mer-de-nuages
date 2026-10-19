@@ -608,6 +608,13 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 
 /* Nuages par altitude */
 .cs-sub { margin: var(--sp-2) 0 var(--sp-3); font-size: 13px; color: var(--text-2); }
+.valley-pick { display: flex; align-items: center; gap: 6px; margin-top: var(--sp-2); }
+.valley-pick span { margin-right: 2px; font-size: 13px; color: var(--text-3); }
+.valley-pick button {
+  height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; font-weight: 600;
+  background: var(--fill); color: var(--text-2); transition: background-color .2s, color .2s;
+}
+.valley-pick button[aria-checked="true"] { background: color-mix(in srgb, var(--link) 18%, transparent); color: var(--link); }
 .mini-seg {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px;
   border-radius: 10px; background: var(--fill);
