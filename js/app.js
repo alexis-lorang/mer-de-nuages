@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=14';
-import { icon } from './icons.js?v=14';
-import { scene } from './scene.js?v=14';
+} from './forecast.js?v=15';
+import { icon } from './icons.js?v=15';
+import { scene } from './scene.js?v=15';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -34,6 +34,7 @@ const state = {
   model: store.get('mdn-model', 'consensus'),
   daylight: store.get('mdn-daylight', '0') === '1',
   cloudView: store.get('mdn-cloud-view', 'days'),
+  themePref: store.get('mdn-theme', 'auto'),
   homeDays: Number(store.get('mdn-home-days', '4')),
   site: null,
   day: null,
@@ -42,6 +43,24 @@ if (!MODELS[state.model]) state.model = 'consensus';
 if (![2, 4, 7].includes(state.homeDays)) state.homeDays = 4;
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const prefersLight = matchMedia('(prefers-color-scheme: light)');
+const THEMES = {
+  auto: ['Automatique', 'Comme le réglage de l’iPhone'],
+  light: ['Clair', 'Fond clair'],
+  dark: ['Sombre', 'Fond sombre'],
+};
+if (!THEMES[state.themePref]) state.themePref = 'auto';
+const currentTheme = () => (state.themePref === 'auto' ? (prefersLight.matches ? 'light' : 'dark') : state.themePref);
+
+// Applique le thème (attribut sur <html>, couleur de la barre du navigateur) et redessine le graphique des nuages.
+function applyTheme() {
+  const t = currentTheme();
+  if (document.documentElement.dataset.theme === t) return;
+  document.documentElement.dataset.theme = t;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#f2f2f7' : '#090d18');
+  if (onDetail && state.result && $('#detail .card.clouds')) refreshCloudCard();
+}
+prefersLight.addEventListener('change', () => { if (state.themePref === 'auto') applyTheme(); });
 const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 const MODEL_INFO = {
   consensus: ['Consensus', 'Moyenne ICON + Météo-France'],
@@ -457,8 +476,13 @@ function ccAt(levels, z) {
 }
 
 // Classes de couverture reprises de meteoblue : 10–25, 25–50, 50–75, 75–90, 90–100 %.
-const CLOUD_BINS = [[90, 'rgb(244,246,253)'], [75, 'rgb(203,210,231)'], [50, 'rgb(160,169,198)'], [25, 'rgb(118,128,162)'], [10, 'rgb(82,92,128)']];
-const cloudColor = (cc) => CLOUD_BINS.find(([min]) => cc >= min)?.[1] ?? null;
+// Sur fond sombre, plus c'est couvert plus c'est clair ; sur fond clair, l'inverse (comme meteoblue).
+const CLOUD_PALETTES = {
+  dark: [[90, 'rgb(244,246,253)'], [75, 'rgb(203,210,231)'], [50, 'rgb(160,169,198)'], [25, 'rgb(118,128,162)'], [10, 'rgb(82,92,128)']],
+  light: [[90, 'rgb(52,60,88)'], [75, 'rgb(88,97,128)'], [50, 'rgb(126,135,164)'], [25, 'rgb(166,174,198)'], [10, 'rgb(200,206,222)']],
+};
+const cloudBins = () => CLOUD_PALETTES[document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'];
+const cloudColor = (cc) => cloudBins().find(([min]) => cc >= min)?.[1] ?? null;
 
 // Échelle d'altitude de meteoblue (0 · 1,5 · 3,5 · 6 · 9 · 14 km), détaillée sous 1,5 km pour les mers de nuages.
 const Z_TICKS = [0, 500, 1000, 1500, 3500, 6000, 9000, 14000];
@@ -473,7 +497,7 @@ function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
   const h0 = new Date(hours[0].time).getTime();
   const rows = Array.from({ length: H }, (_, py) => zAtRow((py + 0.5) / k));
   const grid = hours.map((hr) => rows.map((z) => (z < ground ? -1 : ccAt(hr.levels, z) ?? 0)));
-  const rgb = CLOUD_BINS.map(([min, c]) => [min, c.match(/\d+/g).map(Number)]);
+  const rgb = cloudBins().map(([min, c]) => [min, c.match(/\d+/g).map(Number)]);
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d');
@@ -653,7 +677,7 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
   }
   g += '</svg>';
 
-  const bins = CLOUD_BINS.slice().reverse();
+  const bins = cloudBins().slice().reverse();
   const sub = view === 'days'
     ? `Au-dessus de ${valleyTown(valleyKey)}, vallée à ${Math.round(ground)} m`
     : `${dayLabel(d)}, autour du ${view === 'rise' ? 'lever' : 'coucher'} · au-dessus de ${valleyTown(valleyKey)}`;
@@ -694,11 +718,14 @@ function setCloudView(view) {
   if (view === state.cloudView) return;
   state.cloudView = view;
   store.set('mdn-cloud-view', view);
+  refreshCloudCard();
+}
+
+function refreshCloudCard() {
   const card = $('#detail .card.clouds');
   if (!card) return;
-  const s = siteById(state.site);
   const tmp = document.createElement('div');
-  tmp.innerHTML = cloudCard(s, state.day);
+  tmp.innerHTML = cloudCard(siteById(state.site), state.day);
   const next = tmp.firstElementChild;
   card.replaceWith(next);
   replay([$('svg.cs', next)], 'swap');
@@ -806,10 +833,11 @@ function selectDay(d) {
 
 // Délégation des clics.
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-homedays]');
+  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-homedays], [data-theme-pref]');
   if (!t) return;
   if (t.dataset.cam) return openCam(WEBCAMS.find((c) => c.id === Number(t.dataset.cam)));
   if (t.dataset.model) return setModel(t.dataset.model);
+  if (t.dataset.themePref) return setThemePref(t.dataset.themePref);
   if (t.dataset.cloudview) return setCloudView(t.dataset.cloudview);
   if (t.dataset.homedays) return setHomeDays(Number(t.dataset.homedays));
   if (t.dataset.site) return openSite(t.dataset.site, Number(t.dataset.day));
@@ -936,6 +964,13 @@ function openSettings() {
         ${k === state.model ? icon('check', 'row-check') : ''}
       </button>`).join('')}
     </div>
+    <p class="group-label">Apparence</p>
+    <div class="group">${Object.keys(THEMES).map((k) => `
+      <button class="row tap" data-theme-pref="${k}" aria-pressed="${k === state.themePref}">
+        <span><b>${THEMES[k][0]}</b><small>${THEMES[k][1]}</small></span>
+        ${k === state.themePref ? icon('check', 'row-check') : ''}
+      </button>`).join('')}
+    </div>
     <p class="group-label">Webcams</p>
     <div class="group">
       <label class="row"><span>Dernière image de jour</span>
@@ -961,6 +996,19 @@ function openSettings() {
       img.src = webcamImage(id, state.daylight ? 'daylight' : 'current');
     });
   };
+}
+
+function setThemePref(k) {
+  if (k === state.themePref || !THEMES[k]) return;
+  state.themePref = k;
+  store.set('mdn-theme', k);
+  $$('#sheet [data-theme-pref]').forEach((b) => {
+    const on = b.dataset.themePref === k;
+    b.setAttribute('aria-pressed', String(on));
+    $('.row-check', b)?.remove();
+    if (on) b.insertAdjacentHTML('beforeend', icon('check', 'row-check'));
+  });
+  applyTheme();
 }
 
 function setModel(k) {
@@ -1038,6 +1086,7 @@ fitScreen();
 addEventListener('resize', fitScreen);
 
 document.documentElement.classList.add('no-anim');
+applyTheme();
 route();
 requestAnimationFrame(() => document.documentElement.classList.remove('no-anim'));
 load();

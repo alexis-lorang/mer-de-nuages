@@ -13,7 +13,19 @@
   <link rel="apple-touch-icon" sizes="180x180" href="https://alexis-lorang.github.io/mer-de-nuages/apple-touch-icon-180x180.png">
   <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://alexis-lorang.github.io/mer-de-nuages/apple-touch-icon-precomposed.png">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
-  <link rel="stylesheet" href="css/style.css?v=14">
+  <script>
+    // Thème choisi (ou celui de l'iPhone) appliqué avant l'affichage de la page.
+    (function () {
+      var p = 'auto';
+      try { p = localStorage.getItem('mdn-theme') || 'auto'; } catch (e) { /* stockage indisponible */ }
+      var light = p === 'light' || (p === 'auto' && matchMedia('(prefers-color-scheme: light)').matches);
+      var root = document.documentElement;
+      root.dataset.theme = light ? 'light' : 'dark';
+      if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) root.classList.add('standalone');
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', light ? '#f2f2f7' : '#090d18');
+    })();
+  </script>
+  <link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
   <script>
@@ -68,6 +80,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=14"></script>
+  <script type="module" src="js/app.js?v=15"></script>
 </body>
 </html>

@@ -32,7 +32,8 @@ pour l’ouvrir en plein écran comme une app.
   heure par heure), avec l’altitude du sommet, le jour et la nuit, et la pluie ; météo du jour au sommet ; webcams proches ; lien vers meteoblue.
   Retour par le bouton « Lieux » flottant en bas, ou en glissant depuis le bord gauche (app installée).
   Rien d’interactif dans le haut de l’écran : en mode application, iOS floute la zone sous la barre d’état.
-- **Réglages** (bouton à droite du grand titre) : modèle météo, dernière image de jour pour les webcams, actualisation.
+- **Réglages** (bouton à droite du grand titre) : modèle météo, apparence (automatique, clair ou sombre, mémorisée),
+  dernière image de jour pour les webcams, actualisation.
 - Chaque page a sa propre adresse (`#/lieu/donon/1` = Donon, demain), partageable.
 
 Le météogramme meteoblue ne peut pas être intégré : leur page refuse l’affichage dans un autre site
