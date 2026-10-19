@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=15';
-import { icon } from './icons.js?v=15';
-import { scene } from './scene.js?v=15';
+} from './forecast.js?v=16';
+import { icon } from './icons.js?v=16';
+import { scene } from './scene.js?v=16';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -35,12 +35,10 @@ const state = {
   daylight: store.get('mdn-daylight', '0') === '1',
   cloudView: store.get('mdn-cloud-view', 'days'),
   themePref: store.get('mdn-theme', 'auto'),
-  homeDays: Number(store.get('mdn-home-days', '4')),
   site: null,
   day: null,
 };
 if (!MODELS[state.model]) state.model = 'consensus';
-if (![2, 4, 7].includes(state.homeDays)) state.homeDays = 4;
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const prefersLight = matchMedia('(prefers-color-scheme: light)');
@@ -100,8 +98,9 @@ function dayScore(siteId, d) {
 
 // Les n prochains jours qui ont encore un lever ou un coucher à venir.
 const upcomingDays = (n = 4) => [...new Set(upcoming().map((e) => e.d))].slice(0, n);
-// Jours proposés sur la page d'un lieu : au moins 4, ou autant que sur l'accueil.
-const detailDays = () => upcomingDays(Math.max(4, state.homeDays));
+// Jours affichés, sur l'accueil comme sur la page d'un lieu.
+const DAYS = 7;
+const detailDays = () => upcomingDays(DAYS);
 
 // Levers et couchers à venir (fenêtre pas encore terminée), dans l'ordre.
 function upcoming() {
@@ -187,8 +186,7 @@ function renderHome(enter = false) {
     return;
   }
   const r = state.result;
-  const N = state.homeDays;
-  const days = upcomingDays(N);
+  const days = upcomingDays(DAYS);
 
   // Meilleure occasion des prochains jours, tous lieux confondus.
   let top = null;
@@ -225,43 +223,32 @@ function renderHome(enter = false) {
       </div>
     </div>`;
 
-  // Colonnes : lever et coucher séparés sur 2 jours, meilleur moment du jour sur 4 et 7 jours.
-  const cols = N === 2 ? days.flatMap((d) => [{ d, kind: 'rise' }, { d, kind: 'set' }]) : days.map((d) => ({ d }));
-  const wide = N === 7;
-  const cell = (s, { d, kind }) => {
-    const b = kind ? moment(s.id, d, kind) : dayScore(s.id, d);
-    const k = kind ?? b?.kind;
-    const past = kind && isPast(d, kind);
+  // Une carte par lieu : nom, puis meilleure chance de chaque jour avec l'icône du moment (lever ou coucher).
+  const cell = (s, d) => {
+    const b = dayScore(s.id, d);
     const c = scoreClass(b?.score);
-    const when = kind ? `${KINDS[kind].label.toLowerCase()}` : k ? `au ${KINDS[k].label.toLowerCase()}` : '';
-    return `<button class="rs-day ${c.key}${past ? ' past' : ''}" data-site="${s.id}" data-day="${d}"
-        aria-label="${s.name}, ${dayLabel(d)} ${when}${past ? ' (passé)' : ''} : ${b?.score ?? 'pas de données'}, ${c.label}">
-      <b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b>${!kind && k ? icon(KINDS[k].icon, 'rs-k') : ''}</button>`;
+    const when = b?.kind ? ` au ${KINDS[b.kind].label.toLowerCase()}` : '';
+    return `<button class="pl-day ${c.key}" data-site="${s.id}" data-day="${d}"
+        aria-label="${s.name}, ${dayLabel(d)}${when} : ${b?.score ?? 'pas de données'}, ${c.label}">
+      <span class="pl-d">${dayShort(d)}</span>
+      <b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b>
+      ${b?.kind ? icon(KINDS[b.kind].icon, 'pl-k') : '<i class="pl-k"></i>'}
+    </button>`;
   };
-  const rows = SITES.map((s) => `<div class="row-site${wide ? ' wide' : ''}">
-      <button class="rs-name" data-site="${s.id}" data-day="${days[0]}"><b>${s.name}</b><small>${s.alt} m</small></button>
-      ${wide ? `<div class="rs-days">${cols.map((c) => cell(s, c)).join('')}</div>` : cols.map((c) => cell(s, c)).join('')}
-    </div>`).join('');
-
-  const head = N === 2
-    ? `<div class="cols-head two"><span></span>${days.map((d) => `<span class="col-lbl span2">${dayLabel(d)}</span>`).join('')}
-        <span></span>${cols.map(({ kind }) => `<span class="col-ic" title="${KINDS[kind].label}">${icon(KINDS[kind].icon)}</span>`).join('')}</div>`
-    : `<div class="cols-head${wide ? ' wide' : ''}">${wide ? '' : '<span></span>'}${days.map((d) => `<span class="col-lbl">${dayShort(d)}</span>`).join('')}</div>`;
-  const note = N === 2
-    ? 'Chance de mer de nuages au lever et au coucher du soleil, de 0 à 100. Les moments passés sont grisés.'
-    : `Meilleure chance de la journée, de 0 à 100 ; l’icône indique si c’est au lever ou au coucher.${N === 7 ? ' Au-delà de 4 jours, seul le modèle ICON est disponible : prévision moins sûre.' : ''}`;
+  const places = SITES.map((s) => `<article class="card place">
+      <button class="pl-head" data-site="${s.id}" data-day="${days[0]}">
+        <b>${s.name}</b><small>${s.alt} m</small>${icon('chevron', 'pl-chev')}
+      </button>
+      <div class="pl-days" style="--n:${days.length}">${days.map((d) => cell(s, d)).join('')}</div>
+    </article>`).join('');
+  const note = 'Meilleure chance de la journée, de 0 à 100 ; l’icône indique si c’est au lever ou au coucher. '
+    + 'Au-delà de 4 jours, seul le modèle ICON est disponible : prévision moins sûre.';
 
   body.innerHTML = `
     ${hero}
     <section class="section">
-      <div class="section-head with-seg">
-        <h2>Lieux</h2>
-        <div class="mini-seg compact" role="tablist" aria-label="Nombre de jours">
-          ${[2, 4, 7].map((k) => `<button role="tab" data-homedays="${k}" aria-selected="${k === N}">${k} jours</button>`).join('')}
-        </div>
-      </div>
-      ${head}
-      <div class="card list">${rows}</div>
+      <div class="section-head"><h2>Lieux</h2></div>
+      <div class="stack">${places}</div>
       <div class="legend">
         ${['top', 'good', 'maybe', 'low'].map((k) => `<span class="${k}"><i></i>${scoreClass({ top: 65, good: 40, maybe: 20, low: 0 }[k]).label}</span>`).join('')}
       </div>
@@ -281,7 +268,7 @@ function renderHome(enter = false) {
 function homeSkeleton() {
   return `<div class="card hero skel"><div class="hero-scene shimmer"></div><div class="hero-info"><i class="sk w40"></i><i class="sk w60"></i></div></div>
     <section class="section"><div class="section-head"><h2>Lieux</h2></div>
-    <div class="card list">${SITES.map(() => '<div class="row-site skel"><span class="rs-name"><i class="sk w60"></i><i class="sk w30"></i></span></div>').join('')}</div></section>`;
+    <div class="stack">${SITES.map(() => '<div class="card place skel"><i class="sk w40"></i><div class="pl-days shimmer"></div></div>').join('')}</div></section>`;
 }
 
 function errorCard() {
@@ -704,16 +691,6 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
   </div>`;
 }
 
-function setHomeDays(n) {
-  if (n === state.homeDays) return;
-  state.homeDays = n;
-  store.set('mdn-home-days', String(n));
-  const sc = $('#home .scroller');
-  const y = sc.scrollTop;
-  renderHome();
-  sc.scrollTop = y;
-}
-
 function setCloudView(view) {
   if (view === state.cloudView) return;
   state.cloudView = view;
@@ -833,13 +810,12 @@ function selectDay(d) {
 
 // Délégation des clics.
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-homedays], [data-theme-pref]');
+  const t = e.target.closest('[data-action], [data-site], [data-day], [data-cam], [data-model], [data-cloudview], [data-theme-pref]');
   if (!t) return;
   if (t.dataset.cam) return openCam(WEBCAMS.find((c) => c.id === Number(t.dataset.cam)));
   if (t.dataset.model) return setModel(t.dataset.model);
   if (t.dataset.themePref) return setThemePref(t.dataset.themePref);
   if (t.dataset.cloudview) return setCloudView(t.dataset.cloudview);
-  if (t.dataset.homedays) return setHomeDays(Number(t.dataset.homedays));
   if (t.dataset.site) return openSite(t.dataset.site, Number(t.dataset.day));
   if (t.dataset.day && t.closest('.segmented')) return selectDay(Number(t.dataset.day));
   switch (t.dataset.action) {
