@@ -385,7 +385,6 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 .cs-now { stroke: #fff; stroke-width: 1; stroke-dasharray: 2 2; opacity: .8; }
 .cs-now-dot { fill: #fff; }
 .cs-summit { stroke: var(--c-top); stroke-width: 1.5; stroke-dasharray: 5 3; }
-.cs-summit-lbl { font: 600 10px var(--font); fill: var(--c-top); text-anchor: end; paint-order: stroke; stroke: #0d1222; stroke-width: 3px; stroke-linejoin: round; }
 .cs-rain { fill: #4fa8ff; }
 .cs-lbl { font: 500 9.5px var(--font); fill: var(--text-2); text-anchor: middle; font-variant-numeric: tabular-nums; }
 .cs-lbl.end { text-anchor: end; }

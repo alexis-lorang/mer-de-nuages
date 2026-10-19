@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=10';
-import { icon } from './icons.js?v=10';
-import { scene } from './scene.js?v=10';
+} from './forecast.js?v=11';
+import { icon } from './icons.js?v=11';
+import { scene } from './scene.js?v=11';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -564,8 +564,7 @@ function cloudCard(s, d, valleyKey) {
 
   // Altitude du sommet.
   const sy = y(s.alt);
-  g += `<line x1="${x0}" x2="${x1}" y1="${f(sy)}" y2="${f(sy)}" class="cs-summit"/>
-    <text x="${x1 - 4}" y="${f(sy - 4)}" class="cs-summit-lbl">${s.name} ${s.alt} m</text>`;
+  g += `<line x1="${x0}" x2="${x1}" y1="${f(sy)}" y2="${f(sy)}" class="cs-summit"/>`;
 
   // Pluie au lieu.
   const pMax = Math.max(2, ...rain.map((h) => h.precip ?? 0));
@@ -602,7 +601,7 @@ function cloudCard(s, d, valleyKey) {
     <div class="cs-legend">
       <span><i class="k-day"></i>Jour</span>
       <span><i class="k-night"></i>Nuit</span>
-      <span><i class="k-summit"></i>Sommet</span>
+      <span><i class="k-summit"></i>Sommet (${s.alt} m)</span>
       <span><i class="k-rain"></i>Pluie, max ${num(pMax)} mm/h</span>
     </div>
   </div>`;
