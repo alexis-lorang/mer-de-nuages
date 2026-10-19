@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage,
-} from './config.js?v=40';
+} from './config.js?v=41';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=40';
-import { icon } from './icons.js?v=40';
-import { scene } from './scene.js?v=40';
+} from './forecast.js?v=41';
+import { icon } from './icons.js?v=41';
+import { scene } from './scene.js?v=41';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];

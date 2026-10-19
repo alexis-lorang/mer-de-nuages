@@ -531,8 +531,8 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 .lane.rise { background: color-mix(in srgb, var(--rise) 9%, transparent); }
 .lane.set { background: color-mix(in srgb, var(--set) 9%, transparent); }
 .cmp-row:last-child .lane { border-radius: 0 0 12px 12px; }
-.cmp-lbl { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 0; font-size: 15px; line-height: 1.25; color: var(--text-2); }
-.cmp-lbl > .ic { flex: none; width: 16px; height: 16px; color: var(--text-3); }
+.cmp-lbl { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 0; font-size: 15px; line-height: 1.25; color: var(--text); }
+.cmp-lbl > .ic { flex: none; width: 17px; height: 17px; color: var(--link); }
 .cmp-v {
   display: flex; align-items: center; gap: 6px; padding: 6px var(--sp-2);
   font-size: 15px; line-height: 1.25; font-variant-numeric: tabular-nums;
