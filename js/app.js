@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=26';
-import { icon } from './icons.js?v=26';
-import { scene } from './scene.js?v=26';
+} from './forecast.js?v=28';
+import { icon } from './icons.js?v=28';
+import { scene } from './scene.js?v=28';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -448,21 +448,41 @@ function compareCard(s, rise, set) {
   if (!a && !b) return '';
   const ic = { ok: 'check', mid: 'tilde', bad: 'x' };
   const word = { ok: 'favorable', mid: 'moyen', bad: 'défavorable' };
-  const v = (x) => (!x ? '<span class="cmp-v">–</span>'
-    : `<span class="cmp-v ${x.st}">${x.st ? `<i aria-label="${word[x.st]}">${icon(ic[x.st])}</i>` : ''}${x.ic ? icon(x.ic, 'cmp-wx') : ''}${x.text}</span>`);
+  const v = (x, lane) => (!x ? `<span class="cmp-v lane ${lane}">–</span>`
+    : `<span class="cmp-v lane ${lane} ${x.st}">${x.st ? `<i aria-label="${word[x.st]}">${icon(ic[x.st])}</i>` : ''}${x.ic ? icon(x.ic, 'cmp-wx') : ''}${x.text}</span>`);
   const rows = [
-    ['wx', 'Météo'], ['temp', 'Température'],
-    ['valley', 'Nuages en vallée'], ['top', 'Dessus des nuages'], ['summit', 'Sommet'],
-    ['sky', 'Ciel au-dessus'], ['inv', 'Inversion'], ['wind', 'Vent au sommet'],
-    ['models', state.model === 'consensus' ? 'ICON · Météo-France' : 'Modèle'],
+    ['wx', 'Météo', 'w-cloud'], ['temp', 'Température', 'thermo'],
+    ['valley', 'Nuages en vallée', 'valley'], ['top', 'Dessus des nuages', 'cloud'], ['summit', 'Sommet', 'mountain'],
+    ['sky', 'Ciel au-dessus', 'sky'], ['inv', 'Inversion', 'layers'], ['wind', 'Vent au sommet', 'wind'],
+    ['models', state.model === 'consensus' ? 'ICON · M-France' : 'Modèle', 'scale'],
   ];
-  return `<div class="card">
+  return `<div class="card cmp-card">
     <div class="cmp">
-      <div class="cmp-row cmp-head"><span>Au sommet</span>
-        <span>${icon('sunrise')}Lever</span><span>${icon('sunset')}Coucher</span></div>
-      ${rows.map(([k, label]) => `<div class="cmp-row"><span class="cmp-lbl">${label}</span>${v(a?.[k])}${v(b?.[k])}</div>`).join('')}
+      <div class="cmp-row cmp-head"><span>Conditions</span>
+        <span class="lane rise">${icon('sunrise')}Lever</span><span class="lane set">${icon('sunset')}Coucher</span></div>
+      ${rows.map(([k, label, ic]) => `<div class="cmp-row"><span class="cmp-lbl">${icon(ic)}<span>${label}</span></span>${v(a?.[k], 'rise')}${v(b?.[k], 'set')}</div>`).join('')}
     </div>
   </div>`;
+}
+
+// Famille de temps (teinte de la carte) et couleur d'une température (froid → chaud).
+const WX_TYPE = {
+  'w-sun': 'clear', 'w-partly': 'partly', 'w-cloud': 'cloud', 'w-fog': 'fog',
+  'w-drizzle': 'rain', 'w-rain': 'rain', 'w-snow': 'snow', 'w-storm': 'storm',
+};
+const TEMP_STOPS = [[-5, [122, 160, 255]], [0, [90, 200, 250]], [5, [100, 210, 200]], [10, [139, 217, 106]],
+  [15, [255, 210, 63]], [20, [255, 159, 67]], [25, [255, 107, 74]]];
+function tempColor(t) {
+  const st = TEMP_STOPS;
+  if (t <= st[0][0]) return `rgb(${st[0][1]})`;
+  for (let i = 1; i < st.length; i++) {
+    if (t <= st[i][0]) {
+      const [a, ca] = st[i - 1], [b, cb] = st[i];
+      const k = (t - a) / (b - a);
+      return `rgb(${ca.map((v, j) => Math.round(v + (cb[j] - v) * k)).join(',')})`;
+    }
+  }
+  return `rgb(${st.at(-1)[1]})`;
 }
 
 function weatherCard(s, d) {
@@ -477,18 +497,34 @@ function weatherCard(s, d) {
   const cloud = avg(daytime.map((h) => h.cc).filter((x) => x != null));
   const nowH = d === 0 ? w.hourly[nowIndex(state.result)] : null;
 
-  return `<div class="card weather">
+  // Barre des températures sur l'échelle des jours affichés, comme la vue 10 jours de l'app Météo.
+  const span = detailDays().map((i) => w.daily.find((x) => x.date === state.result.sunrise[i].slice(0, 10))).filter(Boolean);
+  const lo = Math.min(...span.map((x) => x.tmin ?? Infinity)), hi = Math.max(...span.map((x) => x.tmax ?? -Infinity));
+  const pos = (t) => (hi > lo ? (t - lo) / (hi - lo) : 0.5) * 100;
+  const range = day.tmin != null && day.tmax != null && Number.isFinite(lo) ? `<div class="wx-range">
+      <span class="wx-min">${int(day.tmin, '°')}</span>
+      <span class="range" aria-hidden="true">
+        <i style="left:${pos(day.tmin).toFixed(1)}%;width:${Math.max(4, pos(day.tmax) - pos(day.tmin)).toFixed(1)}%;
+          background:linear-gradient(90deg, ${tempColor(day.tmin)}, ${tempColor(day.tmax)})"></i>
+        ${nowH?.t != null ? `<b class="range-now" style="left:${Math.min(100, Math.max(0, pos(nowH.t))).toFixed(1)}%"></b>` : ''}
+      </span>
+      <span class="wx-max">${int(day.tmax, '°')}</span>
+    </div>` : '';
+  const stat = (ic, cls, label, val, unit) => `<div class="wx-stat ${cls}">
+      <small>${icon(ic)}${label}</small><b>${val}<i> ${unit}</i></b></div>`;
+
+  return `<div class="card weather wx-${WX_TYPE[wx.icon] ?? 'cloud'}">
     ${cardHead('thermo', 'Météo au sommet')}
     <div class="wx-main">
       ${icon(wx.icon, 'wx-ic')}
       <div class="wx-text"><b>${wx.label}</b>${nowH ? `<small>Maintenant ${num(nowH.t, '°')} · ${wmo(nowH.code).label.toLowerCase()}</small>` : ''}</div>
-      <div class="wx-temps"><b>${int(day.tmax, '°')}</b><small>${int(day.tmin, '°')}</small></div>
     </div>
+    ${range}
     <div class="wx-stats">
-      <div><small>Pluie</small><b>${num(day.precip)}<i> mm</i></b></div>
-      <div><small>Vent</small><b>${int(day.wind)}<i> km/h</i></b></div>
-      <div><small>Rafales</small><b>${int(day.gust)}<i> km/h</i></b></div>
-      <div><small>Nuages</small><b>${int(cloud)}<i> %</i></b></div>
+      ${stat('drop', 's-rain', 'Pluie', num(day.precip), 'mm')}
+      ${stat('wind', 's-wind', 'Vent', int(day.wind), 'km/h')}
+      ${stat('wind', 's-gust', 'Rafales', int(day.gust), 'km/h')}
+      ${stat('w-cloud', 's-cloud', 'Nuages', int(cloud), '%')}
     </div>
     ${hourlyStrip(w, d)}
   </div>`;
