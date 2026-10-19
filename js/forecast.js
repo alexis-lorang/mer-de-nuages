@@ -10,7 +10,7 @@ const SURFACE = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visi
 const WEATHER = ['weather_code', 'precipitation', 'cloud_cover', 'wind_gusts_10m', 'wind_direction_10m'];
 const DAILY = ['sunrise', 'sunset', 'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max'];
 const ALL_MODELS = MODELS.consensus.ids;
-const CACHE_KEY = 'mdn-forecast-v5';
+const CACHE_KEY = 'mdn-forecast-v6';
 const CACHE_TTL = 30 * 60 * 1000;
 
 function hourlyVars() {
@@ -58,7 +58,11 @@ export async function fetchForecast({ force = false } = {}) {
     raw[l.key] = loc;
   });
   const data = { at: Date.now(), raw };
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch { /* quota */ }
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    // Anciennes versions du cache : inutiles une fois la nouvelle enregistrée (place limitée).
+    for (const k of ['mdn-forecast-v2', 'mdn-forecast-v3', 'mdn-forecast-v4', 'mdn-forecast-v5']) localStorage.removeItem(k);
+  } catch { /* quota */ }
   return data;
 }
 
@@ -69,7 +73,7 @@ async function fetchModel(locs, model, attempt = 1) {
     hourly: hourlyVars().join(','),
     daily: DAILY.join(','),
     models: model,
-    forecast_days: '8',
+    forecast_days: '7',
     timezone: 'Europe/Paris',
   });
   try {
@@ -89,7 +93,7 @@ async function fetchModel(locs, model, attempt = 1) {
 }
 
 function staleCache() {
-  for (const key of [CACHE_KEY, 'mdn-forecast-v4']) {
+  for (const key of [CACHE_KEY, 'mdn-forecast-v5', 'mdn-forecast-v4']) {
     try {
       const c = JSON.parse(localStorage.getItem(key));
       if (c?.raw) return c;

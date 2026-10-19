@@ -110,8 +110,10 @@ export function scene(s, d, cls = 'na', { W = 340, H = 190, labels = true } = {}
     if (labels) {
       const lbl = inCloud ? 'Sommet dans le nuage' : `Nuages ≈ ${d.top} m`;
       const ly = Math.max(12, ty - 1);
+      // Étiquette à droite : le coin haut gauche accueille les boutons lever / coucher.
+      const lw = lbl.length * 5.6 + 14;
       g += `<line x1="0" x2="${W}" y1="${ty}" y2="${ty}" class="sc-line"/>
-        <g transform="translate(10 ${Math.min(H - 22, ly + 6)})"><rect width="${lbl.length * 5.6 + 14}" height="17" rx="8.5" class="sc-pill"/>
+        <g transform="translate(${W - lw - 10} ${Math.max(52, Math.min(H - 22, ly + 6))})"><rect width="${lw}" height="17" rx="8.5" class="sc-pill"/>
         <text x="7" y="12" class="sc-txt dark">${lbl}</text></g>`;
     }
   }

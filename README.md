@@ -1,6 +1,6 @@
 # Mers de nuages · Vosges du Nord
 
-Application web statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 7 jours pour :
+Application web statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 5 jours pour :
 Donon, Rocher de Mutzig, Rocher de Dabo, Col du Valsberg et Château du Haut-Barr.
 
 ## Lancer
@@ -21,7 +21,7 @@ Puis ouvrir http://localhost:8765. Un serveur est nécessaire, car les modules E
 Application web pensée pour iPhone, au style d’iOS. Sur iPhone : Safari → Partager → « Sur l’écran d’accueil »
 pour l’ouvrir en plein écran comme une app.
 
-- **Accueil** : la meilleure chance à venir, puis une carte par lieu avec les 7 prochains jours : meilleure chance
+- **Accueil** : la meilleure chance à venir, puis une carte par lieu avec les 5 prochains jours : meilleure chance
   de la journée et icône du moment (lever ou coucher). Toucher un jour ouvre la page du lieu sur ce jour.
   Tirer vers le bas pour actualiser.
 - **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages), au lever ou au coucher ;

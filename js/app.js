@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=23';
-import { icon } from './icons.js?v=23';
-import { scene } from './scene.js?v=23';
+} from './forecast.js?v=25';
+import { icon } from './icons.js?v=25';
+import { scene } from './scene.js?v=25';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -99,7 +99,7 @@ function dayScore(siteId, d) {
 // Les n prochains jours qui ont encore un lever ou un coucher à venir.
 const upcomingDays = (n = 4) => [...new Set(upcoming().map((e) => e.d))].slice(0, n);
 // Jours affichés, sur l'accueil comme sur la page d'un lieu.
-const DAYS = 7;
+const DAYS = 5;
 const detailDays = () => upcomingDays(DAYS);
 
 // Levers et couchers à venir (fenêtre pas encore terminée), dans l'ordre.
