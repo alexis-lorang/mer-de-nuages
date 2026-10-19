@@ -28,7 +28,7 @@ pour l’ouvrir en plein écran comme une app.
 - **Page d’un lieu** : choix du jour ; indice au lever et au coucher ; coupe illustrée (montagne, mer de nuages) ;
   tableau lever / coucher (météo, température, nuages en vallée, dessus des nuages, sommet, ciel au-dessus,
   inversion, vent, accord des modèles) ; nuages par altitude sur 3 jours au-dessus de la vallée de référence
-  (même échelle et mêmes classes que meteoblue, de 0 à 14 km), ou zoom sur le lever / le coucher (de 0 à 4 km,
+  (même échelle et mêmes classes que meteoblue, de 0 à 14 km), ou zoom dans le temps sur le lever / le coucher (même hauteur,
   heure par heure), avec l’altitude du sommet, le jour et la nuit, et la pluie ; météo du jour au sommet ; webcams proches ; lien vers meteoblue.
   Retour par le bouton « Lieux » flottant en bas, ou en glissant depuis le bord gauche (app installée).
   Rien d’interactif dans le haut de l’écran : en mode application, iOS floute la zone sous la barre d’état.

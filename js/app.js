@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=13';
-import { icon } from './icons.js?v=13';
-import { scene } from './scene.js?v=13';
+} from './forecast.js?v=14';
+import { icon } from './icons.js?v=14';
+import { scene } from './scene.js?v=14';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -500,9 +500,8 @@ function cloudRaster(hours, ground, zAtRow, w, h, tStart, tEnd) {
 const dayHead = (d) => (d === 0 ? 'Aujourd’hui' : d === 1 ? 'Demain'
   : `${cap(fmtWeekday.format(new Date(state.result.sunrise[d])))} ${new Date(state.result.sunrise[d]).getDate()}`);
 
-// Vues du graphique : 3 jours, ou zoom sur le lever / le coucher (basses couches, heure par heure).
+// Vues du graphique : 3 jours, ou zoom dans le temps sur le lever / le coucher (même échelle d'altitude).
 const CLOUD_VIEWS = { days: '3 jours', rise: 'Lever', set: 'Coucher' };
-const Z_LOW = [0, 500, 1000, 1500, 2000, 3000, 4000];
 const cloudValley = (s, d) => dayBest(s.id, d)?.ref?.valley ?? s.valleys[0];
 
 function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
@@ -512,15 +511,14 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
   const all = state.sections[valleyKey];
   const H1 = 3600e3;
 
-  let tStart, tEnd, ticks;
+  const ticks = Z_TICKS;
+  let tStart, tEnd;
   if (view === 'days') {
     tStart = new Date(`${r.sunrise[d].slice(0, 10)}T00:00`).getTime();
     tEnd = Math.min(tStart + 72 * H1, new Date(all.at(-1).time).getTime() + H1);
-    ticks = Z_TICKS;
   } else {
     const at = new Date(view === 'rise' ? r.sunrise[d] : r.sunset[d]).getTime();
     [tStart, tEnd] = view === 'rise' ? [at - 5 * H1, at + 4 * H1] : [at - 4 * H1, at + 5 * H1];
-    ticks = Z_LOW;
   }
   const within = (h) => { const t = new Date(h.time).getTime(); return t >= tStart - H1 && t < tEnd + H1; };
   const hours = all.filter(within);
