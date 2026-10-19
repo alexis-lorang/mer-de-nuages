@@ -370,7 +370,16 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 .wx-stats i { font: 400 12px var(--font); color: var(--text-2); }
 
 /* Nuages par altitude */
-.cs-sub { margin: calc(-1 * var(--sp-2)) 0 var(--sp-2); font-size: 13px; color: var(--text-2); }
+.cs-sub { margin: var(--sp-2) 0 var(--sp-3); font-size: 13px; color: var(--text-2); }
+.mini-seg {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px;
+  border-radius: 10px; background: var(--fill);
+}
+.mini-seg button {
+  height: 32px; border-radius: 8px; font-size: 13px; font-weight: 600; text-align: center; color: var(--text-2);
+  transition: background-color .25s var(--ease-ios), color .2s;
+}
+.mini-seg button[aria-selected="true"] { background: var(--card-hi); color: var(--text); box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
 .cs { display: block; width: 100%; height: auto; overflow: visible; }
 .cs-night { fill: #0b0f1d; }
 .cs-day { fill: #1b2444; }
@@ -378,6 +387,8 @@ body.loading .ptr-spin { animation: spin .8s linear infinite; }
 .cs-grid { stroke: rgba(255, 255, 255, .07); stroke-width: 1; }
 .cs-axis { stroke: rgba(255, 255, 255, .2); stroke-width: 1; }
 .cs-sunline { stroke: rgba(255, 211, 107, .45); stroke-width: 1; stroke-dasharray: 2 3; }
+.cs-sunline.strong { stroke: rgba(255, 211, 107, .85); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.cs-sun-dot { fill: #ffd36b; stroke: var(--card); stroke-width: 2; }
 .cs-midnight { stroke: rgba(255, 255, 255, .5); stroke-width: 1.2; }
 .cs-dayname { font: 600 11px var(--font); fill: var(--text-2); text-anchor: middle; }
 .cs-dayname.on { fill: var(--text); }
