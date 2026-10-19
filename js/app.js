@@ -5,9 +5,9 @@ import {
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, MORNING, EVENING,
-} from './forecast.js?v=19';
-import { icon } from './icons.js?v=19';
-import { scene } from './scene.js?v=19';
+} from './forecast.js?v=21';
+import { icon } from './icons.js?v=21';
+import { scene } from './scene.js?v=21';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -165,6 +165,16 @@ function ring(score, cls, size = 64) {
     </svg>
     <b data-count="${score ?? ''}">${score ?? '–'}</b>
   </div>`;
+}
+
+// Indicateur d'activité façon iOS : 8 rayons d'opacité décroissante.
+function spinner(cls = '') {
+  const rays = Array.from({ length: 8 }, (_, i) => {
+    const a = (i * 45 * Math.PI) / 180;
+    const [x1, y1, x2, y2] = [12 + Math.sin(a) * 5, 12 - Math.cos(a) * 5, 12 + Math.sin(a) * 9.5, 12 - Math.cos(a) * 9.5];
+    return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" style="--o:${(1 - i * 0.11).toFixed(2)}"/>`;
+  }).join('');
+  return `<svg class="spinner ${cls}" viewBox="0 0 24 24" aria-hidden="true">${rays}</svg>`;
 }
 
 const cardHead = (ic, title, extra = '') => `<div class="card-head">${icon(ic)}<span>${title}</span>${extra}</div>`;
@@ -847,6 +857,7 @@ document.addEventListener('click', (e) => {
     case 'settings': return openSettings();
     case 'close-sheet': return closeSheet();
     case 'refresh': closeSheet(); return load(true);
+    case 'refresh-in-sheet': load(true); return updateRefreshRow();
     default:
   }
 });
@@ -862,15 +873,26 @@ for (const page of $$('.page')) {
   }, { passive: true });
 }
 
-// Tirer pour actualiser (rebond natif d'iOS).
+// Tirer pour actualiser (rebond natif d'iOS) : l'indicateur se place dans l'espace qui s'ouvre
+// au-dessus du grand titre, ses rayons apparaissent un à un, puis il tourne quand on peut relâcher.
 let ptrArmed = false;
+const PTR_PULL = 90;
 function pullToRefresh(y) {
   const ptr = $('#home .ptr');
-  if (state.loading) return;
-  const k = Math.min(1, Math.max(0, -y / 80));
-  ptr.style.opacity = k;
-  ptr.style.transform = `translateY(${Math.min(40, -y / 2)}px) rotate(${k * 270}deg)`;
+  const pull = Math.max(0, -y);
+  if (state.loading || pull === 0) {
+    ptr.style.opacity = 0;
+    ptr.classList.remove('armed');
+    ptrArmed = false;
+    return;
+  }
+  const k = Math.min(1, pull / PTR_PULL);
+  ptr.style.opacity = Math.min(1, pull / 30);
+  ptr.style.transform = `translateY(${(pull / 2).toFixed(1)}px)`;
+  ptr.style.setProperty('--shown', Math.ceil(k * 8));
+  $$('line', ptr).forEach((l, i) => l.classList.toggle('on', i < Math.ceil(k * 8)));
   ptrArmed = k >= 1;
+  ptr.classList.toggle('armed', ptrArmed);
 }
 $('#home .scroller').addEventListener('touchend', () => {
   if (ptrArmed && !state.loading) { ptrArmed = false; load(true); }
@@ -954,39 +976,78 @@ sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(); }
   });
 }
 
+// Réglages : listes groupées façon iOS, icône colorée en tête de ligne, aperçus pour le thème.
+const MODEL_ICONS = { consensus: ['scale', '#5e5ce6'], icon_seamless: ['w-cloud', '#0a84ff'], meteofrance_seamless: ['mountain', '#30b0c7'] };
+const tile = (ic, color) => `<span class="tile-ic" style="--tile:${color}">${icon(ic)}</span>`;
+
+function themePreview(k) {
+  const part = (t) => `<span class="tp-screen ${t}"><i class="tp-title"></i><i class="tp-card"></i><i class="tp-card short"></i></span>`;
+  return `<span class="tp-phone${k === 'auto' ? ' auto' : ''}">${k === 'auto' ? part('light') + part('dark') : part(k)}</span>`;
+}
+
+function refreshDetail() {
+  if (state.loading) return `${spinner('inline')}En cours`;
+  return state.data ? hour(state.data.at) : '–';
+}
+function updateRefreshRow() {
+  const el = $('#sheet .refresh-detail');
+  if (el) el.innerHTML = refreshDetail();
+}
+
 function openSettings() {
-  const at = state.data ? `Prévisions de ${hour(state.data.at)}` : 'Prévisions non chargées';
   openSheet('Réglages', `
-    <p class="group-label">Modèle météo</p>
-    <div class="group">${Object.keys(MODELS).map((k) => `
-      <button class="row tap" data-model="${k}" aria-pressed="${k === state.model}">
-        <span><b>${MODEL_INFO[k][0]}</b><small>${MODEL_INFO[k][1]}</small></span>
-        ${k === state.model ? icon('check', 'row-check') : ''}
-      </button>`).join('')}
-    </div>
     <p class="group-label">Apparence</p>
-    <div class="group">${Object.keys(THEMES).map((k) => `
-      <button class="row tap" data-theme-pref="${k}" aria-pressed="${k === state.themePref}">
-        <span><b>${THEMES[k][0]}</b><small>${THEMES[k][1]}</small></span>
-        ${k === state.themePref ? icon('check', 'row-check') : ''}
+    <div class="group themes" role="radiogroup" aria-label="Apparence">
+      ${Object.keys(THEMES).map((k) => `
+        <button class="theme-opt" role="radio" data-theme-pref="${k}" aria-checked="${k === state.themePref}">
+          ${themePreview(k)}
+          <span class="theme-name">${THEMES[k][0]}</span>
+          <span class="radio" aria-hidden="true">${icon('check')}</span>
+        </button>`).join('')}
+    </div>
+
+    <p class="group-label">Modèle météo</p>
+    <div class="group" role="radiogroup" aria-label="Modèle météo">${Object.keys(MODELS).map((k) => `
+      <button class="row tap" role="radio" data-model="${k}" aria-checked="${k === state.model}">
+        ${tile(...MODEL_ICONS[k])}
+        <span class="row-text"><b>${MODEL_INFO[k][0]}</b><small>${MODEL_INFO[k][1]}</small></span>
+        ${icon('check', 'row-check')}
       </button>`).join('')}
     </div>
-    <p class="group-label">Webcams</p>
+    <p class="group-foot">Le consensus fait la moyenne des deux modèles. Au-delà de 4 jours, seul ICON est disponible.</p>
+
+    <p class="group-label">Données</p>
     <div class="group">
-      <label class="row"><span>Dernière image de jour</span>
-        <input type="checkbox" class="switch" id="opt-daylight" ${state.daylight ? 'checked' : ''}></label>
+      <label class="row">
+        ${tile('camera', '#ff9f0a')}
+        <span class="row-text"><b>Webcams de jour</b><small>Dernière image prise en journée</small></span>
+        <input type="checkbox" class="switch" id="opt-daylight" ${state.daylight ? 'checked' : ''}>
+      </label>
+      <button class="row tap" data-action="refresh-in-sheet">
+        ${tile('refresh', '#30d158')}
+        <span class="row-text"><b>Actualiser les prévisions</b></span>
+        <span class="row-detail refresh-detail">${refreshDetail()}</span>
+      </button>
     </div>
+
+    <p class="group-label">À propos</p>
     <div class="group">
-      <button class="row tap accent" data-action="refresh"><span>Actualiser les prévisions</span>${icon('refresh')}</button>
+      <details class="row-details">
+        <summary class="row">
+          ${tile('info', '#8e8e93')}
+          <span class="row-text"><b>Comment l’indice est calculé</b></span>
+          ${icon('chevron', 'row-chev')}
+        </summary>
+        <div class="details-body">
+          <p>Chance de voir une mer de nuages, de 0 à 100, au meilleur moment autour du lever (de 1 h avant à 2 h après)
+            et du coucher du soleil (de 2 h avant à 1 h après).</p>
+          <p>Elle combine cinq facteurs tirés des profils verticaux des modèles : nuages bas en vallée sous le sommet,
+            sommet hors du nuage, ciel dégagé au-dessus, inversion de température et vent faible.</p>
+        </div>
+      </details>
     </div>
-    <p class="group-foot">${at} · Open-Meteo</p>
-    <p class="group-label">À propos de l’indice</p>
-    <div class="group text">
-      <p>Chance de voir une mer de nuages (0–100) au meilleur moment autour du lever (de 1 h avant à 2 h après)
-        et du coucher du soleil (de 2 h avant à 1 h après).</p>
-      <p>Elle combine cinq facteurs tirés des profils verticaux des modèles : nuages bas en vallée sous le sommet,
-        sommet hors du nuage, ciel dégagé au-dessus, inversion de température et vent faible.</p>
-    </div>`, 'settings');
+    <p class="credits">Prévisions <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> ·
+      webcams <a href="https://www.windy.com/webcams" target="_blank" rel="noopener">Windy</a></p>`, 'settings');
   $('#opt-daylight').onchange = (e) => {
     state.daylight = e.target.checked;
     store.set('mdn-daylight', state.daylight ? '1' : '0');
@@ -1002,12 +1063,7 @@ function setThemePref(k) {
   if (k === state.themePref || !THEMES[k]) return;
   state.themePref = k;
   store.set('mdn-theme', k);
-  $$('#sheet [data-theme-pref]').forEach((b) => {
-    const on = b.dataset.themePref === k;
-    b.setAttribute('aria-pressed', String(on));
-    $('.row-check', b)?.remove();
-    if (on) b.insertAdjacentHTML('beforeend', icon('check', 'row-check'));
-  });
+  $$('#sheet [data-theme-pref]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themePref === k)));
   applyTheme();
 }
 
@@ -1015,12 +1071,7 @@ function setModel(k) {
   if (k === state.model) return;
   state.model = k;
   store.set('mdn-model', k);
-  $$('#sheet [data-model]').forEach((b) => {
-    const on = b.dataset.model === k;
-    b.setAttribute('aria-pressed', String(on));
-    $('.row-check', b)?.remove();
-    if (on) b.insertAdjacentHTML('beforeend', icon('check', 'row-check'));
-  });
+  $$('#sheet [data-model]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.model === k)));
   if (!state.data) return;
   compute();
   renderHome();
@@ -1046,25 +1097,35 @@ async function load(force = false) {
   state.loading = true;
   state.error = null;
   document.body.classList.add('loading');
+  setStatus(state.result ? 'Actualisation…' : 'Chargement des prévisions…', true);
+  const ptr = $('#home .ptr');
+  ptr.style.opacity = 0;
+  ptr.classList.remove('armed');
   if (!state.result) { renderHome(); if (onDetail) renderDetail(); }
   try {
     state.data = await fetchForecast({ force });
     const first = !state.result;
     compute();
-    $('#updated').textContent = `Vosges du Nord · prévisions de ${hour(state.data.at)}${state.data.stale ? ' (service indisponible, anciennes données)' : ''}`;
+    setStatus(`Vosges du Nord · prévisions de ${hour(state.data.at)}${state.data.stale ? ' (service indisponible, anciennes données)' : ''}`);
     renderHome(first || force);
     if (onDetail) renderDetail(first || force);
   } catch (e) {
     console.error(e);
     state.error = e.message;
+    setStatus(state.data ? `Vosges du Nord · prévisions de ${hour(state.data.at)}` : 'Prévisions indisponibles');
     if (!state.result) { renderHome(); if (onDetail) renderDetail(); }
   } finally {
     state.loading = false;
     document.body.classList.remove('loading');
-    const ptr = $('#home .ptr');
-    ptr.style.opacity = '';
-    ptr.style.transform = '';
+    updateRefreshRow();
   }
+}
+
+// Sous-titre de l'accueil : date des prévisions, ou chargement en cours avec l'indicateur.
+function setStatus(text, busy = false) {
+  const el = $('#updated');
+  el.classList.toggle('busy', busy);
+  el.innerHTML = busy ? `${spinner('inline')}<span>${text}</span>` : `<span>${text}</span>`;
 }
 
 // Revenir dans l'application : recharge si les prévisions ont plus de 30 min.
@@ -1074,6 +1135,8 @@ document.addEventListener('visibilitychange', () => {
 
 $$('[data-action="settings"].icon-btn').forEach((b) => { b.innerHTML = icon('settings'); });
 $('.back-ic').innerHTML = icon('back');
+$('.sheet-close').innerHTML = icon('x');
+$('#home .ptr').innerHTML = spinner();
 
 // Hauteur réelle de l'écran : en application installée, iOS donne parfois une fenêtre plus courte
 // que l'écran (bande vide en bas). On étend alors les pages à toute la hauteur.

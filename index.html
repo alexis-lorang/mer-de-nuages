@@ -25,7 +25,7 @@
       document.querySelector('meta[name="theme-color"]').setAttribute('content', light ? '#f2f2f7' : '#090d18');
     })();
   </script>
-  <link rel="stylesheet" href="css/style.css?v=19">
+  <link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body>
   <script>
@@ -41,7 +41,7 @@
   <!-- Accueil -->
   <section class="page" id="home" aria-label="Accueil">
     <div class="glows" aria-hidden="true"><div class="glow on" data-glow="home"></div></div>
-    <div class="ptr" aria-hidden="true"><span class="ptr-spin"></span></div>
+    <div class="ptr" aria-hidden="true"></div>
     <div class="scroller">
       <div class="large-title with-action">
         <div>
@@ -73,13 +73,14 @@
     <div class="sheet-panel">
       <div class="sheet-grab" aria-hidden="true"><i></i></div>
       <div class="sheet-head">
+        <span></span>
         <h2 id="sheet-title" tabindex="-1" autofocus></h2>
-        <button class="sheet-done" data-action="close-sheet">OK</button>
+        <button class="sheet-close" data-action="close-sheet" aria-label="Fermer"></button>
       </div>
       <div class="sheet-body" id="sheet-body"></div>
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=19"></script>
+  <script type="module" src="js/app.js?v=21"></script>
 </body>
 </html>
