@@ -55,11 +55,11 @@ et on garde la meilleure :
 
 | Facteur | Source |
 |---|---|
-| Nuages bas en vallée sous le sommet | couverture nuageuse aux niveaux de pression des 350 premiers mètres au-dessus du fond de vallée (une couche suspendue plus haut ne compte pas) + brouillard (visibilité), retenu seulement s’il dure plus d’une heure |
+| Nuages bas en vallée sous le sommet | couverture nuageuse aux niveaux de pression des 350 premiers mètres au-dessus du fond de vallée (une couche suspendue plus haut ne compte pas) + brouillard (visibilité), retenu seulement s’il dure plus d’une heure + brouillard déduit de l’air au sol (écart température / point de rosée sous ~2 °C, inversion juste au-dessus, vent faible), aussi tracé sur le graphique ; pour ce brouillard, AROME compte double face à ICON |
 | Sommet hors du nuage | couverture interpolée à l’altitude du site |
 | Ciel dégagé au-dessus | couverture des niveaux au-dessus + nuages moyens (nuages hauts légèrement pénalisants) |
 | Inversion | T au-dessus du sommet − T dans la couche nuageuse |
-| Vent faible | vent interpolé à l’altitude du site |
+| Vent faible | vent interpolé à l’altitude du site (pénalise au-delà de 25 km/h) |
 
 L’indice retient le meilleur créneau entre 1 h avant et 2 h après le lever du soleil, et entre 2 h avant et 1 h après le coucher.
 Les seuils et pondérations sont dans `js/forecast.js` (`scoreHour`). C’est une heuristique, à ajuster avec l’expérience du terrain.

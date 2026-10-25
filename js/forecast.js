@@ -1,5 +1,5 @@
 // Récupération Open-Meteo + calcul de l'indice "mer de nuages".
-import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=46';
+import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=48';
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
@@ -170,6 +170,26 @@ function dewPoint(t, rh) {
 }
 const lerp01 = (x, x0, x1) => clamp((x - x0) / (x1 - x0), 0, 1);
 
+// Brouillard de vallée diagnostiqué : air presque saturé au sol, inversion juste au-dessus, vent faible.
+// Les couvertures nuageuses par niveau ratent souvent ces couches minces (sous le premier niveau de pression).
+// Indice plus faible qu'une couche vue par le modèle : couverture plafonnée à 85. Renvoie la couverture et un sommet.
+export function fogEstimate(t2m, td2m, wind10m, levels, ground) {
+  if (t2m == null || td2m == null) return { cc: 0, top: null };
+  const sat = 1 - lerp01(t2m - td2m, 0.5, 2);
+  let tMax = -Infinity, zMax = null;
+  for (const l of levels) {
+    if (l.z > ground && l.z <= ground + 800 && l.t != null && l.t > tMax) { tMax = l.t; zMax = l.z; }
+  }
+  const inv = Number.isFinite(tMax) ? lerp01(tMax - t2m, 0.5, 2.5) : 0;
+  const calm = 1 - lerp01(wind10m ?? 0, 10, 25);
+  const cc = Math.round(85 * sat * inv * calm);
+  return { cc, top: cc ? Math.min(ground + 200, zMax ?? Infinity) : null };
+}
+
+// Brouillard déduit de l'humidité : AROME (maille fine sur la France) compte double face à ICON.
+const FOG_WEIGHT = { meteofrance_seamless: 2 };
+const fogWeight = (m) => FOG_WEIGHT[m] ?? 1;
+
 // Épaisseur au-dessus du fond de vallée où la couche doit commencer : sans nuages au ras du sol,
 // pas de mer de nuages (une couche suspendue plus haut ne remplit pas la vallée).
 const FLOOR_DEPTH = 350;
@@ -182,11 +202,15 @@ function valleyLayer(vp, alt) {
   for (const l of lv) if (l.z <= floorTop) seaCC = Math.max(seaCC, l.cc);
 
   const vis = vp.sfc.fogVis;
-  let fog = false;
+  let fogTop = null;
   if (vis != null) {
     const fogCC = vis < 1000 ? 95 : vis < 2500 ? 60 : 0;
-    if (fogCC > seaCC) { seaCC = fogCC; fog = true; }
+    if (fogCC > seaCC) { seaCC = fogCC; fogTop = vp.ground + 150; }
   }
+  const hf = fogEstimate(vp.sfc.temperature_2m, vp.sfc.dew_point_2m ?? dewPoint(vp.sfc.temperature_2m, vp.sfc.relative_humidity_2m),
+    vp.sfc.wind_speed_10m, vp.levels, vp.ground);
+  let diag = false;
+  if (hf.cc > seaCC) { seaCC = hf.cc; fogTop = hf.top; diag = true; }
 
   // Sommet : couche >= 40 % partant du fond de vallée, puis premier niveau sec au-dessus.
   const TH = 40;
@@ -199,13 +223,13 @@ function valleyLayer(vp, alt) {
       const a = lv[j], b = lv[j + 1];
       top = a.z + ((a.cc - TH) / (a.cc - b.cc)) * (b.z - a.z);
     } else top = lv[j].z;
-  } else if (fog) top = vp.ground + 150;
-  return { seaCC, top };
+  } else if (fogTop != null) top = Math.min(fogTop, alt - 30);
+  return { seaCC, top, diag };
 }
 
 function scoreHour(sp, vp, alt) {
   if (!sp || !vp) return null;
-  const { seaCC, top } = valleyLayer(vp, alt);
+  const { seaCC, top, diag } = valleyLayer(vp, alt);
 
   const summitCC = clamp(interp(sp.levels, alt + 20, 'cc') ?? 0, 0, 100);
   let aboveCC = 0;
@@ -225,7 +249,7 @@ function scoreHour(sp, vp, alt) {
   const invF = dT == null ? 0.8 : 0.5 + 0.5 * lerp01(dT, -3, 0);
 
   const wind = interp(sp.levels, alt, 'ws') ?? sp.sfc.wind_speed_10m ?? 0;
-  const windF = 1 - 0.6 * lerp01(wind, 15, 45);
+  const windF = 1 - 0.5 * lerp01(wind, 25, 55);
 
   const score = 100 * (seaCC / 100) * (1 - summitCC / 100) * (1 - 0.85 * aboveCC / 100)
     * (1 - 0.25 * high / 100) * invF * windF;
@@ -243,7 +267,7 @@ function scoreHour(sp, vp, alt) {
   return {
     met,
     score: Math.round(clamp(score, 0, 100)),
-    seaCC: Math.round(seaCC), top: top == null ? null : Math.round(top),
+    seaCC: Math.round(seaCC), top: top == null ? null : Math.round(top), diagFog: diag,
     summitCC: Math.round(summitCC), aboveCC: Math.round(aboveCC), high: Math.round(high),
     dT: dT == null ? null : Math.round(dT * 10) / 10, wind: Math.round(wind),
   };
@@ -280,11 +304,20 @@ export function computeAll(data, modelKey) {
       if (!vals.length) return { time: t, score: null, perModel };
       // Modèles en désaccord : celui qui voit la mer de nuages compte double, et triple quand il est
       // le seul à voir une couche au sol (les couches de vallée minces échappent souvent à l'autre).
+      // Un brouillard seulement déduit de l'humidité ne suffit pas pour ce bonus.
       const ref = vals.reduce((a, r) => (r.score > a.score ? r : a));
       const others = vals.filter((r) => r !== ref);
-      const alone = ref.seaCC >= 50 && others.length > 0 && others.every((r) => r.seaCC < 25);
-      const w = alone ? 3 : 2;
-      const avg = Math.round((w * ref.score + others.reduce((a, r) => a + r.score, 0)) / (w + others.length));
+      const alone = ref.seaCC >= 50 && !ref.diagFog && others.length > 0 && others.every((r) => r.seaCC < 25);
+      let avg;
+      if (vals.some((r) => r.diagFog)) {
+        // Brouillard déduit de l'humidité : moyenne pondérée par la fiabilité des modèles sur ce point.
+        const ent = Object.entries(perModel);
+        const wSum = ent.reduce((a, [m]) => a + fogWeight(m), 0);
+        avg = Math.round(ent.reduce((a, [m, r]) => a + fogWeight(m) * r.score, 0) / wSum);
+      } else {
+        const w = alone ? 3 : 2;
+        avg = Math.round((w * ref.score + others.reduce((a, r) => a + r.score, 0)) / (w + others.length));
+      }
       // Conditions au sommet : moyenne des modèles ; vallée : celle du modèle de référence.
       const mean = (k) => {
         const xs = vals.map((v) => v.met.site[k]).filter((x) => x != null);
@@ -388,7 +421,20 @@ export function cloudSection(data, key, modelKey) {
   if (!loc) return [];
   const h = loc.hourly;
   const models = MODELS[modelKey].ids;
+  const ground = loc.elevation ?? 0;
   return h.time.map((time, i) => {
+    // Brouillard diagnostiqué, moyenné sur les modèles comme les niveaux.
+    let fogCC = 0, fogTop = 0, nf = 0;
+    for (const m of models) {
+      const lv = LEVELS.map((p) => ({ z: pick(h, `geopotential_height_${p}hPa`, m)?.[i], t: pick(h, `temperature_${p}hPa`, m)?.[i] }))
+        .filter((l) => l.z != null && l.t != null);
+      const t2 = pick(h, 'temperature_2m', m)?.[i];
+      if (t2 == null) continue;
+      const fe = fogEstimate(t2, pick(h, 'dew_point_2m', m)?.[i] ?? dewPoint(t2, pick(h, 'relative_humidity_2m', m)?.[i]),
+        pick(h, 'wind_speed_10m', m)?.[i], lv, ground);
+      fogCC += fogWeight(m) * fe.cc; fogTop = Math.max(fogTop, fe.top ?? 0); nf += fogWeight(m);
+    }
+    if (nf) fogCC /= nf;
     const levels = [];
     for (const p of [...LEVELS, ...HIGH_LEVELS]) {
       let z = 0, cc = 0, n = 0;
@@ -400,7 +446,11 @@ export function cloudSection(data, key, modelKey) {
       }
       if (n) levels.push({ z: z / n, cc: cc / n });
     }
+    if (fogCC >= 20 && fogTop > ground) {
+      for (const l of levels) if (l.z <= fogTop) l.cc = Math.max(l.cc, fogCC);
+      levels.push({ z: ground, cc: fogCC }, { z: fogTop - 20, cc: fogCC });
+    }
     levels.sort((a, b) => a.z - b.z);
-    return { time, ground: loc.elevation ?? 0, levels };
+    return { time, ground, levels };
   });
 }
