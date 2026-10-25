@@ -336,6 +336,8 @@ body.dragging .page, body.dragging #home::after { transition: none; }
   font-size: 15px; font-weight: 600; text-decoration: none; color: var(--on-glass);
 }
 .pill-btn .ic { width: 16px; height: 16px; }
+.pill-btn, .vsel { transition: transform .3s var(--spring); }
+.pill-btn:active, .vsel:active { transform: scale(.95); }
 .glass {
   background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); color: var(--on-glass);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
@@ -387,6 +389,9 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 .g-good { stroke: var(--c-good); }
 .g-top { stroke: var(--c-top); }
 .g-knob { fill: #fff; stroke: var(--indigo); stroke-width: 3.5; }
+/* Le curseur tourne autour du centre de l'arc : il balaie la jauge jusqu'à la valeur. */
+.g-knob-g { transform-box: view-box; transform-origin: 70px 70px; transform: rotate(var(--r)); }
+.rise .g-knob-g, .swap .g-knob-g { animation: knob-sweep 1.1s var(--ease-ios) .15s backwards; }
 .gauge.na .g-knob { display: none; }
 .gauge b { position: absolute; left: 0; right: 0; top: 36px; text-align: center; font: 600 30px/1 var(--font); font-variant-numeric: tabular-nums; }
 .gauge small { position: absolute; left: 0; right: 0; top: 78px; text-align: center; font-size: 12px; color: var(--text-2); }
@@ -520,6 +525,8 @@ body.dragging .page, body.dragging #home::after { transition: none; }
   transition: color .25s;
 }
 .seg[aria-selected="true"] { color: var(--on-glass-sel); }
+.seg > * { transition: transform .3s var(--spring); }
+.seg:active > * { transform: scale(.9); }
 /* Petite jauge sous chaque jour */
 .seg::before, .seg::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 7px; height: 4px; border-radius: 2px; }
 .seg::before { background: rgba(255, 255, 255, .25); }
@@ -540,20 +547,31 @@ body.dragging .page, body.dragging #home::after { transition: none; }
 .scene-card svg { display: block; width: 100%; height: auto; }
 /* Pilule en verre (lever / coucher de la coupe, période du graphique) */
 .gpill {
-  display: flex; gap: var(--sp-1); padding: 3px; border-radius: 20px;
+  position: relative; display: flex; gap: var(--sp-1); padding: 3px; border-radius: 20px;
   background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
 }
 .gpill button {
-  display: grid; place-items: center; width: 36px; height: 32px; border-radius: 16px; color: var(--on-glass);
-  transition: background-color .25s var(--ease-ios), color .2s;
+  position: relative; z-index: 1; display: grid; place-items: center; width: 36px; height: 32px; border-radius: 16px; color: var(--on-glass);
+  transition: color .25s var(--ease-ios);
 }
-.gpill button[aria-selected="true"] { background: var(--glass-sel); color: var(--on-glass-sel); }
+.gpill button[aria-selected="true"] { color: var(--on-glass-sel); }
+.gpill button .ic { transition: transform .3s var(--spring); }
+.gpill button:active .ic { transform: scale(.82); }
+/* Fond blanc qui glisse d'un bouton à l'autre */
+.gpill-thumb {
+  position: absolute; top: 3px; left: 3px; width: 36px; height: 32px; border-radius: 16px;
+  background: var(--glass-sel); box-shadow: 0 2px 6px rgba(59, 53, 87, .18);
+  transform: translateX(calc(var(--k) * 40px));
+}
+.gpill-thumb.slide { animation: thumb-slide .5s var(--spring); }
 .gpill .ic { width: 17px; height: 17px; stroke-width: 1.8; }
 .scene-switch { position: absolute; right: var(--sp-3); bottom: var(--sp-3); }
 
 /* Illustration */
 .sc-drift { animation: wave 18s linear infinite; }
+/* La mer de nuages monte doucement quand l'image change (jour, lever / coucher). */
+.rise .sc-sea, .swap .sc-sea { animation: sea-rise .9s var(--ease-ios) backwards; }
 .sc-drift.back { animation-duration: 26s; animation-direction: reverse; }
 .sc-high { animation: drift-x 26s ease-in-out infinite alternate; }
 .sc-txt { font: 400 12px var(--font); fill: #4e4770; }
@@ -812,7 +830,10 @@ button.row:active, summary.row:active { background: var(--fill); transform: none
 .swap { animation: swap .35s var(--ease-ios) backwards; animation-delay: calc(var(--i, 0) * 25ms); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
-@keyframes swap { from { opacity: 0; transform: translateY(6px); } }
+@keyframes swap { from { opacity: 0; transform: translate(var(--dx, 0px), 6px); } }
+@keyframes thumb-slide { from { transform: translateX(calc(var(--k0) * 40px)); } }
+@keyframes knob-sweep { from { transform: rotate(0deg); } }
+@keyframes sea-rise { from { opacity: 0; transform: translateY(14px); } }
 @keyframes twinkle { from { opacity: .15; } to { opacity: .9; } }
 @keyframes breathe { from { transform: scale(.92); opacity: .85; } to { transform: scale(1.08); opacity: 1; } }
 @keyframes drift-x { to { transform: translateX(18px); } }

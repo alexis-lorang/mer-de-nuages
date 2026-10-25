@@ -73,9 +73,10 @@ export function scene(s, d, cls = 'na', { W = 340, H = 220, labels = true } = {}
       <rect x="${W * 0.55}" y="${H * 0.07}" width="${W * 0.26}" height="${8 * k}" rx="${4 * k}"/></g>`;
   }
 
-  // Crêtes lointaines, puis le pic (deux versants et un sommet plus clair).
-  g += `<path d="M0 ${f(0.42)} L${W * 0.09} ${f(0.56)} L${W * 0.18} ${f(0.48)} L${W * 0.28} ${f(0.62)} L${W * 0.39} ${f(0.46)} L${W * 0.5} ${f(0.3)} L0 ${f(0.3)} Z" fill="#cdb7dc"/>
-    <path d="M${W * 0.8} ${f(0.4)} L${W * 0.88} ${f(0.52)} L${W * 0.95} ${f(0.46)} L${W} ${f(0.56)} L${W} ${f(0.3)} L${W * 0.8} ${f(0.3)} Z" fill="#d8c5e3"/>
+  // Crêtes lointaines et collines du fond de vallée (jusqu'en bas : pas de ciel sous le relief), puis le pic.
+  g += `<path d="M0 ${H} L0 ${f(0.42)} L${W * 0.09} ${f(0.56)} L${W * 0.18} ${f(0.48)} L${W * 0.28} ${f(0.62)} L${W * 0.39} ${f(0.46)} L${W * 0.5} ${f(0.34)} L${W * 0.6} ${f(0.3)} L${W * 0.6} ${H} Z" fill="#cdb7dc"/>
+    <path d="M${W * 0.75} ${H} L${W * 0.8} ${f(0.4)} L${W * 0.88} ${f(0.52)} L${W * 0.95} ${f(0.46)} L${W} ${f(0.56)} L${W} ${H} Z" fill="#d8c5e3"/>
+    <path d="M0 ${H} L0 ${f(0.26)} Q${W * 0.22} ${f(0.36)} ${W * 0.45} ${f(0.24)} T${W} ${f(0.22)} L${W} ${H} Z" fill="#bea8d3"/>
     <path d="M${peakX - half} ${H} L${peakX} ${py} L${peakX + half} ${H} Z" fill="#7f78b0"/>
     <path d="M${peakX} ${py} L${peakX + half} ${H} L${peakX + half * 0.3} ${H} Z" fill="#6c65a2"/>`;
   const ch = Math.min(24 * k, (H - py) * 0.18);
@@ -86,7 +87,7 @@ export function scene(s, d, cls = 'na', { W = 340, H = 220, labels = true } = {}
   if (hasSea) {
     const op = (0.75 + 0.25 * d.seaCC / 100).toFixed(2);
     const step = 40 * k;
-    g += `<g style="opacity:${op}">
+    g += `<g class="sc-sea" style="opacity:${op}">
       ${puffs(ty + 22 * k, [22, 26, 20, 25].map((r) => r * k), step, '#efd6e4', W, H, 'sc-drift back')}
       ${puffs(ty + 42 * k, [20, 24, 19, 23].map((r) => r * k), step, '#f9e6ec', W, H, 'sc-drift')}
       ${puffs(ty + 64 * k, [22, 25, 21, 24].map((r) => r * k), step, '#fff8f5', W, H, 'sc-drift back')}

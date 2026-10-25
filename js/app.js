@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage, scoreValleys,
-} from './config.js?v=43';
+} from './config.js?v=46';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=43';
-import { icon } from './icons.js?v=43';
-import { scene } from './scene.js?v=43';
+} from './forecast.js?v=46';
+import { icon } from './icons.js?v=46';
+import { scene } from './scene.js?v=46';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -166,11 +166,21 @@ function gauge(score, size = '') {
     const [x0, y0] = pt(a0 + (i ? 1 : 0)), [x1, y1] = pt(a1 - (i < 3 ? 1 : 0));
     return `<path d="M${x0} ${y0} A56 56 0 0 1 ${x1} ${y1}" class="g-seg g-${k}"${i === 0 || i === 3 ? ' stroke-linecap="round"' : ''}/>`;
   }).join('');
-  const [kx, ky] = pt(score ?? 0);
   return `<div class="gauge ${size}${score == null ? ' na' : ''}" role="img" aria-label="Indice ${score ?? 'indisponible'} sur 100">
-    <svg viewBox="0 0 140 84" aria-hidden="true">${arcs}<circle class="g-knob" cx="${kx}" cy="${ky}" r="9"/></svg>
+    <svg viewBox="0 0 140 84" aria-hidden="true">${arcs}<g class="g-knob-g" style="--r:${((score ?? 0) * 1.8).toFixed(1)}deg"><circle class="g-knob" cx="14" cy="70" r="9"/></g></svg>
     <b data-count="${score ?? ''}" aria-hidden="true">${score ?? '–'}</b>${size ? '' : '<small aria-hidden="true">sur 100</small>'}
   </div>`;
+}
+
+// Fond blanc d'une pilule, sous le bouton choisi (indice k).
+const gpillThumb = (k) => `<span class="gpill-thumb" style="--k:${k}" aria-hidden="true"></span>`;
+
+// Fait glisser le fond d'une pilule fraîchement redessinée depuis son ancienne position.
+function slideThumb(root, from) {
+  const th = $('.gpill-thumb', root);
+  if (!th || from < 0) return;
+  th.style.setProperty('--k0', from);
+  th.classList.add('slide');
 }
 
 // Légende en échelle : un segment par niveau (classe de couleur ou teinte donnée), libellés dessous.
@@ -413,7 +423,7 @@ function sceneCard(s, d, kind) {
   const c = scoreClass(m?.score);
   return `<div class="card scene-card">
     ${scene(s, m?.ref ?? null, m ? c.key : 'low')}
-    <div class="scene-switch gpill" role="tablist" aria-label="Moment illustré">
+    <div class="scene-switch gpill" role="tablist" aria-label="Moment illustré">${gpillThumb(kind === 'set' ? 1 : 0)}
       ${['rise', 'set'].map((k) => `<button role="tab" data-scene="${k}" aria-selected="${k === kind}"
         aria-label="${k === 'rise' ? 'Au lever' : 'Au coucher'}" title="${k === 'rise' ? 'Au lever' : 'Au coucher'}">${icon(KINDS[k].icon)}</button>`).join('')}
     </div>
@@ -423,11 +433,13 @@ function sceneCard(s, d, kind) {
 function setSceneKind(kind) {
   const card = $('#detail .scene-card');
   if (!card || card.querySelector(`[data-scene="${kind}"][aria-selected="true"]`)) return;
+  const from = kind === 'set' ? 0 : 1;
   state.sceneKind = kind;
   const tmp = document.createElement('div');
   tmp.innerHTML = sceneCard(siteById(state.site), state.day, kind);
   const next = tmp.firstElementChild;
   card.replaceWith(next);
+  slideThumb(next, from);
   replay([$('svg.scene', next)], 'swap');
 }
 
@@ -840,7 +852,7 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
     ${cardHead('layers', 'Nuages par altitude')}
     <p class="cs-sub">${when} · vallée à ${Math.round(ground)} m</p>
     <div class="cs-controls">
-      <div class="gpill" role="tablist" aria-label="Période du graphique">
+      <div class="gpill" role="tablist" aria-label="Période du graphique">${gpillThumb(Object.keys(CLOUD_VIEWS).indexOf(view))}
         ${Object.entries(CLOUD_VIEWS).map(([k, [label, ic]]) => `<button role="tab" data-cloudview="${k}" aria-selected="${k === view}" aria-label="${label}" title="${label}">${icon(ic)}</button>`).join('')}
       </div>
       ${valleyCtl}
@@ -864,18 +876,20 @@ function setChartValley(k) {
 
 function setCloudView(view) {
   if (view === state.cloudView) return;
+  const from = Object.keys(CLOUD_VIEWS).indexOf(state.cloudView);
   state.cloudView = view;
   store.set('mdn-cloud-view', view);
-  refreshCloudCard();
+  refreshCloudCard(from);
 }
 
-function refreshCloudCard() {
+function refreshCloudCard(from = -1) {
   const card = $('#detail .card.clouds');
   if (!card) return;
   const tmp = document.createElement('div');
   tmp.innerHTML = cloudCard(siteById(state.site), state.day);
   const next = tmp.firstElementChild;
   card.replaceWith(next);
+  slideThumb(next, from);
   replay([$('svg.cs', next)], 'swap');
 }
 
@@ -965,6 +979,10 @@ window.addEventListener('popstate', route);
 
 function selectDay(d) {
   if (d === state.day) return;
+  const box = $('#d-day');
+  box?.style.setProperty('--dx', `${d > state.day ? 28 : -28}px`);
+  clearTimeout(selectDay.t);
+  selectDay.t = setTimeout(() => box?.style.removeProperty('--dx'), 700);
   state.day = d;
   state.sceneKind = null;
   history.replaceState(history.state, '', `#/lieu/${state.site}/${d}`);
