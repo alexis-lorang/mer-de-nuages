@@ -51,6 +51,9 @@ export const SITES = [
   },
 ];
 
+// Vallées prises en compte dans le score : celles du graphique du lieu, sinon ses vallées de référence.
+export const scoreValleys = (s) => (s.chart?.length ? s.chart : s.valleys);
+
 // Fonds de vallée / plaines où se forment les stratus et brouillards.
 export const VALLEYS = {
   sarrebourg:  { name: 'Plateau lorrain (Sarrebourg)', lat: 48.735, lon: 7.055 },

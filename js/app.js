@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
-  webcamImage, webcamPlayer, meteobluePage,
-} from './config.js?v=41';
+  webcamImage, webcamPlayer, meteobluePage, scoreValleys,
+} from './config.js?v=42';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=41';
-import { icon } from './icons.js?v=41';
-import { scene } from './scene.js?v=41';
+} from './forecast.js?v=42';
+import { icon } from './icons.js?v=42';
+import { scene } from './scene.js?v=42';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -384,7 +384,7 @@ function renderDay(enter = false) {
     <div class="card about">
       ${cardHead('pin', 'Le lieu')}
       <p>${s.note}</p>
-      <p class="muted">Vallées de référence : ${s.valleys.map(valleyName).join(', ')}.</p>
+      <p class="muted">Vallées de référence : ${scoreValleys(s).map(valleyName).join(', ')}.</p>
       <a class="pill-btn tap" href="${meteobluePage(s)}" target="_blank" rel="noopener">Prévisions meteoblue ${icon('external')}</a>
     </div>`;
 

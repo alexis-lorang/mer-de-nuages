@@ -1,5 +1,5 @@
 // Récupération Open-Meteo + calcul de l'indice "mer de nuages".
-import { SITES, VALLEYS, MODELS } from './config.js?v=41';
+import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=42';
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
@@ -259,7 +259,7 @@ export function computeAll(data, modelKey) {
       const perModel = {};
       for (const m of models) {
         let best = null;
-        for (const vk of s.valleys) {
+        for (const vk of scoreValleys(s)) {
           const r = scoreHour(profiles[m][s.id]?.[i], profiles[m][vk]?.[i], s.alt);
           if (r && (!best || r.score > best.score)) best = { ...r, valley: vk };
         }
@@ -267,7 +267,10 @@ export function computeAll(data, modelKey) {
       }
       const vals = Object.values(perModel);
       if (!vals.length) return { time: t, score: null, perModel };
-      const avg = Math.round(vals.reduce((a, r) => a + r.score, 0) / vals.length);
+      // Modèles en désaccord : celui qui voit la mer de nuages compte double
+      // (les brouillards de vallée minces échappent souvent à l'un des deux).
+      const sorted = vals.map((r) => r.score).sort((a, b) => b - a);
+      const avg = Math.round((2 * sorted[0] + sorted.slice(1).reduce((a, b) => a + b, 0)) / (vals.length + 1));
       const ref = vals.reduce((a, r) => (r.score > a.score ? r : a));
       // Conditions au sommet : moyenne des modèles ; vallée : celle du modèle de référence.
       const mean = (k) => {
