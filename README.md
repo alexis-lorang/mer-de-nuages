@@ -1,4 +1,4 @@
-# Mers de nuages · Vosges du Nord
+# Cloud Chaser · mers de nuages des Vosges du Nord
 
 Application web statique (HTML/JS, sans build) qui prévoit les mers de nuages sur 5 jours pour :
 Donon, Rocher de Mutzig, Rocher de Dabo, Col du Valsberg, Château du Haut-Barr et Château de Lutzelbourg.
