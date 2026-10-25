@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage, scoreValleys,
-} from './config.js?v=42';
+} from './config.js?v=43';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=42';
-import { icon } from './icons.js?v=42';
-import { scene } from './scene.js?v=42';
+} from './forecast.js?v=43';
+import { icon } from './icons.js?v=43';
+import { scene } from './scene.js?v=43';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -56,7 +56,7 @@ function applyTheme() {
   const t = currentTheme();
   if (document.documentElement.dataset.theme === t) return;
   document.documentElement.dataset.theme = t;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#f2f2f7' : '#090d18');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#fdeee2' : '#1c1a31');
   if (onDetail && state.result && $('#detail .card.clouds')) refreshCloudCard();
 }
 prefersLight.addEventListener('change', () => { if (state.themePref === 'auto') applyTheme(); });
@@ -155,18 +155,29 @@ function weatherFor(siteId) {
 
 // ---------- Petits composants ----------
 
-function ring(score, cls, size = 64) {
-  const r = size / 2 - 5;
-  const c = 2 * Math.PI * r;
-  const off = c * (1 - (score ?? 0) / 100);
-  return `<div class="ring ${cls}" style="width:${size}px;height:${size}px">
-    <svg viewBox="0 0 ${size} ${size}" aria-hidden="true">
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-track"/>
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-val" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${c.toFixed(1)}" data-off="${off.toFixed(1)}"/>
-    </svg>
-    <b data-count="${score ?? ''}">${score ?? '–'}</b>
+// Jauge en demi-cercle : quatre segments aux seuils de l'indice (20, 40, 65), curseur sur la valeur.
+const GAUGE_SEGS = [['low', 0, 20], ['maybe', 20, 40], ['good', 40, 65], ['top', 65, 100]];
+function gauge(score, size = '') {
+  const pt = (v) => {
+    const a = ((180 - v * 1.8) * Math.PI) / 180;
+    return [70 + 56 * Math.cos(a), 70 - 56 * Math.sin(a)].map((x) => x.toFixed(2));
+  };
+  const arcs = GAUGE_SEGS.map(([k, a0, a1], i) => {
+    const [x0, y0] = pt(a0 + (i ? 1 : 0)), [x1, y1] = pt(a1 - (i < 3 ? 1 : 0));
+    return `<path d="M${x0} ${y0} A56 56 0 0 1 ${x1} ${y1}" class="g-seg g-${k}"${i === 0 || i === 3 ? ' stroke-linecap="round"' : ''}/>`;
+  }).join('');
+  const [kx, ky] = pt(score ?? 0);
+  return `<div class="gauge ${size}${score == null ? ' na' : ''}" role="img" aria-label="Indice ${score ?? 'indisponible'} sur 100">
+    <svg viewBox="0 0 140 84" aria-hidden="true">${arcs}<circle class="g-knob" cx="${kx}" cy="${ky}" r="9"/></svg>
+    <b data-count="${score ?? ''}" aria-hidden="true">${score ?? '–'}</b>${size ? '' : '<small aria-hidden="true">sur 100</small>'}
   </div>`;
 }
+
+// Légende en échelle : un segment par niveau (classe de couleur ou teinte donnée), libellés dessous.
+const scaleLegend = (items, label) => `<div class="scale" role="img" aria-label="${label}" style="--n:${items.length}">
+    <div class="scale-bar" aria-hidden="true">${items.map(([cls, , col]) => `<i class="${cls ?? ''}"${col ? ` style="background:${col}"` : ''}></i>`).join('')}</div>
+    <div class="scale-lbl" aria-hidden="true">${items.map(([, l]) => `<span>${l}</span>`).join('')}</div>
+  </div>`;
 
 // Indicateur d'activité façon iOS : 8 rayons d'opacité décroissante.
 function spinner(cls = '') {
@@ -213,27 +224,28 @@ function renderHome(enter = false) {
     const c = scoreClass(top.b.score);
     const k = KINDS[top.b.kind];
     return `<button class="card hero tap ${c.key}" data-site="${top.s.id}" data-day="${top.d}">
-      <div class="hero-scene">${scene(top.s, top.b.ref, c.key, { W: 360, H: 150, labels: false })}</div>
+      <div class="hero-scene">${scene(top.s, top.b.ref, c.key, { W: 360, H: 160, labels: false })}
+        <span class="hero-badge glass">${icon('star')}Meilleure chance</span></div>
       <div class="hero-info">
         <div class="hero-row">
           <div class="hero-text">
-            <p class="eyebrow">${icon('star')}Meilleure chance</p>
             <h2 class="hero-site">${top.s.name}</h2>
             <p class="hero-meta">${icon(k.icon)}${dayLabel(top.d)} · ${k.label.toLowerCase()} ${hour(k.at(r, top.d))}</p>
+            <span class="chip ${c.key}">${c.label}</span>
           </div>
-          ${ring(top.b.score, c.key, 72)}
+          ${gauge(top.b.score)}
         </div>
       </div>
       <div class="hero-foot">
-        <span class="chip ${c.key}">${c.label}</span>
+        ${icon('cloud')}
         <span class="hero-note">${cap(layerNote(top.s, top.b.ref))}</span>
         ${icon('chevron', 'hero-chev')}
       </div>
     </button>`;
   })() : `<div class="card hero">
-      <div class="hero-scene">${scene(SITES[0], null, 'low', { W: 360, H: 150, labels: false })}</div>
+      <div class="hero-scene">${scene(SITES[0], null, 'low', { W: 360, H: 160, labels: false })}
+        <span class="hero-badge glass">${days.length} prochains jours</span></div>
       <div class="hero-info">
-        <p class="eyebrow">${days.length} prochains jours</p>
         <h2 class="hero-site">Pas de mer de nuages en vue</h2>
         <p class="hero-meta">Aucune couche basse prévue sous les sommets.</p>
       </div>
@@ -251,6 +263,7 @@ function renderHome(enter = false) {
       <span class="pl-d">${dayShort(d)}</span>
       <b data-count="${b?.score ?? ''}">${b?.score ?? '–'}</b>
       ${b?.kind ? icon(KINDS[b.kind].icon, 'pl-k') : '<i class="pl-k"></i>'}
+      ${best ? `<span class="pl-best" aria-hidden="true">${icon('star')}</span>` : ''}
     </button>`;
   };
   const places = SITES.map((s) => {
@@ -264,18 +277,15 @@ function renderHome(enter = false) {
       <div class="pl-days" style="--n:${days.length}">${days.map((d, j) => cell(s, d, j, j === bestJ)).join('')}</div>
     </article>`;
   }).join('');
-  const note = 'Meilleure chance de la journée, de 0 à 100 : la case se remplit d’autant, l’icône indique le lever '
-    + 'ou le coucher, le meilleur jour est entouré. Au-delà de 4 jours, seul le modèle ICON est disponible.';
 
   body.innerHTML = `
     ${hero}
     <section class="section">
-      <div class="section-head"><h2>Lieux</h2><span class="section-sub">${days.length} prochains jours</span></div>
-      <div class="stack">${places}</div>
-      <div class="legend">
-        ${['top', 'good', 'maybe', 'low'].map((k) => `<span class="${k}"><i></i>${scoreClass({ top: 65, good: 40, maybe: 20, low: 0 }[k]).label}</span>`).join('')}
-      </div>
-      <p class="footnote">${note}</p>
+      <div class="section-head"><h2>Lieux</h2><span class="section-sub">${days.length} prochains jours
+        <button class="help-btn" data-action="help-days" aria-label="Comment lire les cases"><span aria-hidden="true">?</span></button></span></div>
+      <div class="stack tight">${places}</div>
+      ${scaleLegend(['low', 'maybe', 'good', 'top'].map((k) => [k, scoreClass({ top: 65, good: 40, maybe: 20, low: 0 }[k]).label]),
+        'Légende de l’indice, du plus faible au plus fort : peu probable, possible, probable, très probable')}
     </section>
     <section class="section">
       <div class="section-head"><h2>Webcams</h2></div>
@@ -287,6 +297,9 @@ function renderHome(enter = false) {
     </footer>`;
   animateIn(body, enter);
 }
+
+const DAYS_NOTE = 'Meilleure chance de la journée, de 0 à 100 : la case se remplit d’autant, l’icône indique le lever '
+  + 'ou le coucher, le meilleur jour est entouré et marqué d’une étoile. Au-delà de 4 jours, seul le modèle ICON est disponible.';
 
 function homeSkeleton() {
   return `<div class="card hero skel"><div class="hero-scene shimmer"></div><div class="hero-info"><i class="sk w40"></i><i class="sk w60"></i></div></div>
@@ -363,9 +376,9 @@ function renderDay(enter = false) {
     const k = KINDS[kind];
     const mc = scoreClass(m?.score);
     const past = isPast(d, kind);
-    return `<div class="card moment ${mc.key}${past ? ' past' : ''}" style="--v:${Math.max(0.04, (m?.score ?? 0) / 100).toFixed(2)}">
+    return `<div class="card moment ${mc.key}${past ? ' past' : ''}">
       ${cardHead(k.icon, `${k.label} ${hour(k.at(r, d))}`)}
-      <b class="m-score" data-count="${m?.score ?? ''}">${m?.score ?? '–'}</b>
+      ${gauge(m?.score ?? null, 'sm')}
       <span class="chip ${mc.key}">${mc.label}</span>
       <p class="m-foot">${past ? 'Passé' : m ? `Idéal vers ${hour(m.time)}` : 'Pas de données'}</p>
     </div>`;
@@ -400,7 +413,7 @@ function sceneCard(s, d, kind) {
   const c = scoreClass(m?.score);
   return `<div class="card scene-card">
     ${scene(s, m?.ref ?? null, m ? c.key : 'low')}
-    <div class="scene-switch" role="tablist" aria-label="Moment illustré">
+    <div class="scene-switch gpill" role="tablist" aria-label="Moment illustré">
       ${['rise', 'set'].map((k) => `<button role="tab" data-scene="${k}" aria-selected="${k === kind}"
         aria-label="${k === 'rise' ? 'Au lever' : 'Au coucher'}" title="${k === 'rise' ? 'Au lever' : 'Au coucher'}">${icon(KINDS[k].icon)}</button>`).join('')}
     </div>
@@ -582,11 +595,11 @@ function ccAt(levels, z) {
 }
 
 // Trois niveaux de couverture, nommés : plus lisibles que des tranches de pourcentage.
-// Sur le ciel bleu du graphique : quelques nuages blancs, nuageux gris clair, couvert gris foncé.
+// Une même teinte lavande, du plus clair (quelques nuages) au plus foncé (couvert) ; éclaircie sur le fond de nuit.
 const CLOUD_LEVELS = [[80, 'Couvert'], [50, 'Nuageux'], [20, 'Quelques nuages']];
 const CLOUD_PALETTES = {
-  dark: [[80, 'rgb(236,240,248)'], [50, 'rgb(160,174,202)'], [20, 'rgb(98,120,162)']],
-  light: [[80, 'rgb(104,114,138)'], [50, 'rgb(190,198,214)'], [20, 'rgb(255,255,255)']],
+  dark: [[80, 'rgb(236,232,248)'], [50, 'rgb(176,168,214)'], [20, 'rgb(120,112,170)']],
+  light: [[80, 'rgb(85,80,144)'], [50, 'rgb(138,130,191)'], [20, 'rgb(185,176,219)']],
 };
 const cloudBins = () => CLOUD_PALETTES[document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'];
 const cloudColor = (cc) => cloudBins().find(([min]) => cc >= min)?.[1] ?? null;
@@ -677,7 +690,7 @@ const dayHead = (d) => (d === 0 ? 'Aujourd’hui' : d === 1 ? 'Demain'
   : `${cap(fmtWeekday.format(new Date(state.result.sunrise[d])))} ${new Date(state.result.sunrise[d]).getDate()}`);
 
 // Vues du graphique : la journée choisie, ou zoom sur le lever / le coucher.
-const CLOUD_VIEWS = { day: 'Journée', rise: 'Lever', set: 'Coucher' };
+const CLOUD_VIEWS = { day: ['Toute la journée', 'sky'], rise: ['Autour du lever', 'sunrise'], set: ['Autour du coucher', 'sunset'] };
 // Vallée du graphique : celle choisie pour ce lieu (liste `chart` de la config), sinon la vallée du meilleur moment.
 function cloudValley(s, d) {
   const want = s.chart?.length
@@ -816,22 +829,27 @@ function cloudCard(s, d, valleyKey = cloudValley(s, d)) {
 
   g += '</svg>';
 
-  const sub = `${view === 'day' ? dayLabel(d) : `${dayLabel(d)}, autour du ${view === 'rise' ? 'lever' : 'coucher'}`} · au-dessus de ${valleyTown(valleyKey)} (vallée à ${Math.round(ground)} m)`;
+  const when = view === 'day' ? `${dayLabel(d)}, toute la journée` : `${dayLabel(d)}, autour du ${view === 'rise' ? 'lever' : 'coucher'}`;
+  const valleyCtl = s.chart?.length > 1
+    ? `<label class="vsel glass">
+        <select data-chartvalley-select aria-label="Vallée du graphique">${s.chart.map((k) => `<option value="${k}"${k === valleyKey ? ' selected' : ''}>${valleyTown(k)}</option>`).join('')}</select>
+        ${icon('updown')}
+      </label>`
+    : `<span class="vsel solo glass">${valleyTown(valleyKey)}</span>`;
   return `<div class="card clouds">
     ${cardHead('layers', 'Nuages par altitude')}
-    <div class="mini-seg" role="tablist" aria-label="Période du graphique">
-      ${Object.entries(CLOUD_VIEWS).map(([k, label]) => `<button role="tab" data-cloudview="${k}" aria-selected="${k === view}">${label}</button>`).join('')}
+    <p class="cs-sub">${when} · vallée à ${Math.round(ground)} m</p>
+    <div class="cs-controls">
+      <div class="gpill" role="tablist" aria-label="Période du graphique">
+        ${Object.entries(CLOUD_VIEWS).map(([k, [label, ic]]) => `<button role="tab" data-cloudview="${k}" aria-selected="${k === view}" aria-label="${label}" title="${label}">${icon(ic)}</button>`).join('')}
+      </div>
+      ${valleyCtl}
     </div>
-    ${s.chart?.length > 1 ? `<div class="valley-pick" role="radiogroup" aria-label="Vallée du graphique">
-      <span>Vallée</span>
-      ${s.chart.map((k) => `<button role="radio" data-chartvalley="${k}" aria-checked="${k === valleyKey}">${valleyTown(k)}</button>`).join('')}
-    </div>` : ''}
-    <p class="cs-sub">${sub}</p>
     ${g}
     <div class="cs-legend">
-      ${cloudBins().slice().reverse().map(([min, col]) => `<span><i class="k-cloud" style="background:${col}"></i>${cloudWord(min)}</span>`).join('')}
-      <span><i class="k-summit"></i>Sommet ${s.alt} m</span>
-      <span><i class="k-rain"></i>Pluie</span>
+      ${scaleLegend(cloudBins().slice().reverse().map(([min, col]) => [null, cloudWord(min), col]),
+        'Couverture nuageuse, du plus clair au plus foncé : quelques nuages, nuageux, couvert')}
+      <div class="cs-keys"><span><i class="k-summit"></i>Sommet ${s.alt} m</span><span><i class="k-rain"></i>Pluie</span></div>
     </div>
   </div>`;
 }
@@ -873,7 +891,6 @@ function nearCams(s) {
 function animateIn(root, enter, els = [...root.children]) {
   replay(els, enter ? 'rise' : 'swap');
   countUp(root);
-  fillRings(root);
 }
 
 function replay(els, cls) {
@@ -899,13 +916,6 @@ function countUp(root) {
     el.textContent = '0';
     requestAnimationFrame(step);
   });
-}
-
-function fillRings(root) {
-  for (const c of $$('.ring-val', root)) {
-    getComputedStyle(c).strokeDashoffset; // fixe l'état de départ pour que la transition parte de 0
-    c.style.strokeDashoffset = c.dataset.off;
-  }
 }
 
 // ---------- Navigation ----------
@@ -978,11 +988,17 @@ document.addEventListener('click', (e) => {
   switch (t.dataset.action) {
     case 'back': return goBack();
     case 'settings': return openSettings();
+    case 'help-days': return openSheet('Lire les cases', `<p class="help-body">${DAYS_NOTE}</p>`);
     case 'close-sheet': return closeSheet();
     case 'refresh': closeSheet(); return load(true);
     case 'refresh-in-sheet': load(true); return updateRefreshRow();
     default:
   }
+});
+
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-chartvalley-select]');
+  if (sel) setChartValley(sel.value);
 });
 
 // Grand titre élastique quand on tire vers le bas.
@@ -1100,7 +1116,7 @@ sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(); }
 }
 
 // Réglages : listes groupées façon iOS, icône colorée en tête de ligne, aperçus pour le thème.
-const MODEL_ICONS = { consensus: ['scale', '#5e5ce6'], icon_seamless: ['w-cloud', '#0a84ff'], meteofrance_seamless: ['mountain', '#30b0c7'] };
+const MODEL_ICONS = { consensus: ['scale', '#5f5a92'], icon_seamless: ['w-cloud', '#6f8fc9'], meteofrance_seamless: ['mountain', '#e98a7e'] };
 const tile = (ic, color) => `<span class="tile-ic" style="--tile:${color}">${icon(ic)}</span>`;
 
 function themePreview(k) {
@@ -1142,12 +1158,12 @@ function openSettings() {
     <p class="group-label">Données</p>
     <div class="group">
       <label class="row">
-        ${tile('camera', '#ff9f0a')}
+        ${tile('camera', '#f4a26b')}
         <span class="row-text"><b>Webcams de jour</b><small>Dernière image prise en journée</small></span>
         <input type="checkbox" class="switch" id="opt-daylight" ${state.daylight ? 'checked' : ''}>
       </label>
       <button class="row tap" data-action="refresh-in-sheet">
-        ${tile('refresh', '#30d158')}
+        ${tile('refresh', '#6fb08c')}
         <span class="row-text"><b>Actualiser les prévisions</b></span>
         <span class="row-detail refresh-detail">${refreshDetail()}</span>
       </button>
@@ -1157,7 +1173,7 @@ function openSettings() {
     <div class="group">
       <details class="row-details">
         <summary class="row">
-          ${tile('info', '#8e8e93')}
+          ${tile('info', '#8e88b8')}
           <span class="row-text"><b>Comment l’indice est calculé</b></span>
           ${icon('chevron', 'row-chev')}
         </summary>

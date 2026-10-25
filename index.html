@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Cloud Chaser</title>
   <meta name="description" content="Prévision des mers de nuages dans les Vosges du Nord">
-  <meta name="theme-color" content="#090d18">
+  <meta name="theme-color" content="#1c1a31">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -22,10 +22,13 @@
       var root = document.documentElement;
       root.dataset.theme = light ? 'light' : 'dark';
       if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) root.classList.add('standalone');
-      document.querySelector('meta[name="theme-color"]').setAttribute('content', light ? '#f2f2f7' : '#090d18');
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', light ? '#fdeee2' : '#1c1a31');
     })();
   </script>
-  <link rel="stylesheet" href="css/style.css?v=42">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css?v=43">
 </head>
 <body>
   <script>
@@ -81,6 +84,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=42"></script>
+  <script type="module" src="js/app.js?v=43"></script>
 </body>
 </html>
