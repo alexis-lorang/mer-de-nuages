@@ -55,7 +55,7 @@ et on garde la meilleure :
 
 | Facteur | Source |
 |---|---|
-| Nuages bas en vallée sous le sommet | couverture nuageuse aux niveaux de pression sous l’altitude du site + visibilité (brouillard) |
+| Nuages bas en vallée sous le sommet | couverture nuageuse aux niveaux de pression des 350 premiers mètres au-dessus du fond de vallée (une couche suspendue plus haut ne compte pas) + brouillard (visibilité), retenu seulement s’il dure plus d’une heure |
 | Sommet hors du nuage | couverture interpolée à l’altitude du site |
 | Ciel dégagé au-dessus | couverture des niveaux au-dessus + nuages moyens (nuages hauts légèrement pénalisants) |
 | Inversion | T au-dessus du sommet − T dans la couche nuageuse |

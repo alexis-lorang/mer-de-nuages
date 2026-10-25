@@ -1,5 +1,5 @@
 // Récupération Open-Meteo + calcul de l'indice "mer de nuages".
-import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=43';
+import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=46';
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
@@ -137,6 +137,12 @@ function buildProfiles(loc, model) {
     for (const k of SURFACE) sfc[k] = pick(h, k, model)?.[i];
     out.push(levels.length ? { levels, sfc, ground } : null);
   }
+  // Brouillard (visibilité) retenu seulement s'il dure : une heure isolée est souvent un artefact du modèle.
+  const vis = pick(h, 'visibility', model) ?? [];
+  out.forEach((o, i) => {
+    if (!o || vis[i] == null) return;
+    o.sfc.fogVis = Math.max(vis[i], Math.min(vis[i - 1] ?? Infinity, vis[i + 1] ?? Infinity));
+  });
   return out;
 }
 
@@ -164,23 +170,28 @@ function dewPoint(t, rh) {
 }
 const lerp01 = (x, x0, x1) => clamp((x - x0) / (x1 - x0), 0, 1);
 
-// Couche nuageuse basse dans la vallée : couverture, sommet estimé.
+// Épaisseur au-dessus du fond de vallée où la couche doit commencer : sans nuages au ras du sol,
+// pas de mer de nuages (une couche suspendue plus haut ne remplit pas la vallée).
+const FLOOR_DEPTH = 350;
+
+// Couche nuageuse basse dans la vallée : couverture au ras du fond de vallée, sommet estimé.
 function valleyLayer(vp, alt) {
   const lv = vp.levels.filter((l) => l.z > vp.ground - 20);
+  const floorTop = Math.min(alt - 30, vp.ground + FLOOR_DEPTH);
   let seaCC = 0;
-  for (const l of lv) if (l.z < alt - 30) seaCC = Math.max(seaCC, l.cc);
+  for (const l of lv) if (l.z <= floorTop) seaCC = Math.max(seaCC, l.cc);
 
-  const vis = vp.sfc.visibility;
+  const vis = vp.sfc.fogVis;
   let fog = false;
   if (vis != null) {
     const fogCC = vis < 1000 ? 95 : vis < 2500 ? 60 : 0;
     if (fogCC > seaCC) { seaCC = fogCC; fog = true; }
   }
 
-  // Sommet : première couche >= 40 % puis premier niveau sec au-dessus.
+  // Sommet : couche >= 40 % partant du fond de vallée, puis premier niveau sec au-dessus.
   const TH = 40;
   let top = null;
-  const iStart = lv.findIndex((l) => l.cc >= TH && l.z < alt + 600);
+  const iStart = lv.findIndex((l) => l.cc >= TH && l.z <= floorTop);
   if (iStart >= 0) {
     let j = iStart;
     while (j + 1 < lv.length && lv[j + 1].cc >= TH) j++;
@@ -267,11 +278,13 @@ export function computeAll(data, modelKey) {
       }
       const vals = Object.values(perModel);
       if (!vals.length) return { time: t, score: null, perModel };
-      // Modèles en désaccord : celui qui voit la mer de nuages compte double
-      // (les brouillards de vallée minces échappent souvent à l'un des deux).
-      const sorted = vals.map((r) => r.score).sort((a, b) => b - a);
-      const avg = Math.round((2 * sorted[0] + sorted.slice(1).reduce((a, b) => a + b, 0)) / (vals.length + 1));
+      // Modèles en désaccord : celui qui voit la mer de nuages compte double, et triple quand il est
+      // le seul à voir une couche au sol (les couches de vallée minces échappent souvent à l'autre).
       const ref = vals.reduce((a, r) => (r.score > a.score ? r : a));
+      const others = vals.filter((r) => r !== ref);
+      const alone = ref.seaCC >= 50 && others.length > 0 && others.every((r) => r.seaCC < 25);
+      const w = alone ? 3 : 2;
+      const avg = Math.round((w * ref.score + others.reduce((a, r) => a + r.score, 0)) / (w + others.length));
       // Conditions au sommet : moyenne des modèles ; vallée : celle du modèle de référence.
       const mean = (k) => {
         const xs = vals.map((v) => v.met.site[k]).filter((x) => x != null);
