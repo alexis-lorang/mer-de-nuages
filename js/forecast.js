@@ -1,5 +1,5 @@
 // Récupération Open-Meteo + calcul de l'indice "mer de nuages".
-import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=48';
+import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=49';
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
@@ -186,9 +186,10 @@ export function fogEstimate(t2m, td2m, wind10m, levels, ground) {
   return { cc, top: cc ? Math.min(ground + 200, zMax ?? Infinity) : null };
 }
 
-// Brouillard déduit de l'humidité : AROME (maille fine sur la France) compte double face à ICON.
-const FOG_WEIGHT = { meteofrance_seamless: 2 };
-const fogWeight = (m) => FOG_WEIGHT[m] ?? 1;
+// Les couvertures par niveau (déduites de l'humidité) et le brouillard diagnostiqué voient de l'air humide
+// comme un nuage. Si le modèle lui-même ne prévoit ni nuages bas ni visibilité réduite, on les plafonne.
+const NATIVE_LOW = 20, NATIVE_VIS = 5000, HUMID_CAP = 30;
+const noNativeLow = (low, vis) => (low ?? 0) < NATIVE_LOW && (vis == null || vis > NATIVE_VIS);
 
 // Épaisseur au-dessus du fond de vallée où la couche doit commencer : sans nuages au ras du sol,
 // pas de mer de nuages (une couche suspendue plus haut ne remplit pas la vallée).
@@ -211,6 +212,7 @@ function valleyLayer(vp, alt) {
     vp.sfc.wind_speed_10m, vp.levels, vp.ground);
   let diag = false;
   if (hf.cc > seaCC) { seaCC = hf.cc; fogTop = hf.top; diag = true; }
+  if (noNativeLow(vp.sfc.cloud_cover_low, vis)) seaCC = Math.min(seaCC, HUMID_CAP);
 
   // Sommet : couche >= 40 % partant du fond de vallée, puis premier niveau sec au-dessus.
   const TH = 40;
@@ -308,16 +310,8 @@ export function computeAll(data, modelKey) {
       const ref = vals.reduce((a, r) => (r.score > a.score ? r : a));
       const others = vals.filter((r) => r !== ref);
       const alone = ref.seaCC >= 50 && !ref.diagFog && others.length > 0 && others.every((r) => r.seaCC < 25);
-      let avg;
-      if (vals.some((r) => r.diagFog)) {
-        // Brouillard déduit de l'humidité : moyenne pondérée par la fiabilité des modèles sur ce point.
-        const ent = Object.entries(perModel);
-        const wSum = ent.reduce((a, [m]) => a + fogWeight(m), 0);
-        avg = Math.round(ent.reduce((a, [m, r]) => a + fogWeight(m) * r.score, 0) / wSum);
-      } else {
-        const w = alone ? 3 : 2;
-        avg = Math.round((w * ref.score + others.reduce((a, r) => a + r.score, 0)) / (w + others.length));
-      }
+      const w = alone ? 3 : 2;
+      const avg = Math.round((w * ref.score + others.reduce((a, r) => a + r.score, 0)) / (w + others.length));
       // Conditions au sommet : moyenne des modèles ; vallée : celle du modèle de référence.
       const mean = (k) => {
         const xs = vals.map((v) => v.met.site[k]).filter((x) => x != null);
@@ -432,7 +426,8 @@ export function cloudSection(data, key, modelKey) {
       if (t2 == null) continue;
       const fe = fogEstimate(t2, pick(h, 'dew_point_2m', m)?.[i] ?? dewPoint(t2, pick(h, 'relative_humidity_2m', m)?.[i]),
         pick(h, 'wind_speed_10m', m)?.[i], lv, ground);
-      fogCC += fogWeight(m) * fe.cc; fogTop = Math.max(fogTop, fe.top ?? 0); nf += fogWeight(m);
+      const capped = noNativeLow(pick(h, 'cloud_cover_low', m)?.[i], pick(h, 'visibility', m)?.[i]);
+      fogCC += capped ? Math.min(fe.cc, HUMID_CAP) : fe.cc; fogTop = Math.max(fogTop, fe.top ?? 0); nf++;
     }
     if (nf) fogCC /= nf;
     const levels = [];
@@ -440,8 +435,10 @@ export function cloudSection(data, key, modelKey) {
       let z = 0, cc = 0, n = 0;
       for (const m of models) {
         const zz = pick(h, `geopotential_height_${p}hPa`, m)?.[i];
-        const c = pick(h, `cloud_cover_${p}hPa`, m)?.[i];
+        let c = pick(h, `cloud_cover_${p}hPa`, m)?.[i];
         if (zz == null || c == null) continue;
+        // Mêmes plafonds que le score pour les nuages bas (jusqu'à ~2 km).
+        if (zz < 2000 && noNativeLow(pick(h, 'cloud_cover_low', m)?.[i], pick(h, 'visibility', m)?.[i])) c = Math.min(c, HUMID_CAP);
         z += zz; cc += c; n++;
       }
       if (n) levels.push({ z: z / n, cc: cc / n });
