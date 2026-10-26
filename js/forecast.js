@@ -1,5 +1,5 @@
 // Récupération Open-Meteo + calcul de l'indice "mer de nuages".
-import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=51';
+import { SITES, VALLEYS, MODELS, scoreValleys } from './config.js?v=52';
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
 const WIND_LEVELS = [950, 925, 900, 850];
