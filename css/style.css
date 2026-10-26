@@ -425,7 +425,11 @@ body.dragging .page, body.dragging #home::after { transition: none; }
   clip-path: inset(calc(100% - var(--v) * 100%) 0 0 0);
 }
 :root:not([data-theme="light"]) .pl-day::before { opacity: .6; }
-.pl-day.best { box-shadow: inset 0 0 0 2px var(--indigo); }
+/* Contour du meilleur jour par-dessus le remplissage, pour qu'il reste entier. */
+.pl-day.best::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--indigo);
+}
 .pl-best {
   position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
   background: var(--indigo); color: #fff; border: 2px solid #fff; box-shadow: 0 3px 8px rgba(59, 53, 87, .25);
