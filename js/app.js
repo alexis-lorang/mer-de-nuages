@@ -1,13 +1,13 @@
 import {
   SITES, VALLEYS, WEBCAMS, MODELS,
   webcamImage, webcamPlayer, meteobluePage, scoreValleys,
-} from './config.js?v=50';
+} from './config.js?v=51';
 import {
   fetchForecast, computeAll, morningWindow, eveningWindow, bestInWindow, scoreClass, nowIndex,
   siteWeather, cloudSection, staleCache, MORNING, EVENING,
-} from './forecast.js?v=50';
-import { icon } from './icons.js?v=50';
-import { scene } from './scene.js?v=50';
+} from './forecast.js?v=51';
+import { icon } from './icons.js?v=51';
+import { scene } from './scene.js?v=51';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -276,7 +276,14 @@ function renderHome(enter = false) {
       ${best ? `<span class="pl-best" aria-hidden="true">${icon('star')}</span>` : ''}
     </button>`;
   };
-  const places = SITES.map((s) => {
+  // Meilleurs lieux d'abord : plus haute chance sur les jours affichés, puis la deuxième, etc.
+  const ranked = SITES.map((s) => ({ s, desc: days.map((d) => dayScore(s.id, d)?.score ?? -1).sort((x, y) => y - x) }))
+    .sort((a, b) => {
+      for (let k = 0; k < a.desc.length; k++) if (a.desc[k] !== b.desc[k]) return b.desc[k] - a.desc[k];
+      return 0;
+    })
+    .map(({ s }) => s);
+  const places = ranked.map((s) => {
     const scores = days.map((d) => dayScore(s.id, d)?.score ?? -1);
     const max = Math.max(...scores);
     const bestJ = max >= 20 ? scores.indexOf(max) : -1;
